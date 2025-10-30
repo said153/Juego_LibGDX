@@ -1,0 +1,59 @@
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+  }
+  dependencies {
+    classpath "com.android.tools.build:gradle:8.9.3"
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+  }
+}
+
+allprojects {
+  apply plugin: 'eclipse'
+  apply plugin: 'idea'
+
+  idea {
+    module {
+      outputDir file('build/classes/java/main')
+      testOutputDir file('build/classes/java/test')
+    }
+  }
+}
+
+configure(subprojects - project(':android')) {
+  apply plugin: 'java-library'
+  apply plugin: 'kotlin'
+  sourceCompatibility = 8
+
+  tasks.register('generateAssetList') {
+    inputs.dir("${project.rootDir}/assets/")
+    File assetsFolder = new File("${project.rootDir}/assets/")
+    File assetsFile = new File(assetsFolder, "assets.txt")
+    assetsFile.delete()
+
+    fileTree(assetsFolder).collect { assetsFolder.relativePath(it) }.sort().each {
+      assetsFile.append(it + "\n")
+    }
+  }
+  processResources.dependsOn 'generateAssetList'
+
+  compileJava {
+    options.incremental = true
+  }
+  compileKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+  compileTestKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+}
+
+subprojects {
+  version = "$projectVersion"
+  ext.appName = 'Juego_Tron'
+  repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+  }
+}
+
+eclipse.project.name = 'Juego_Tron' + '-parent'

@@ -1,0 +1,21 @@
+plugins {
+  id 'java-library'
+  id 'org.jetbrains.kotlin.jvm'
+}
+
+sourceCompatibility = 8
+targetCompatibility = 8
+
+dependencies {
+  api "com.badlogicgames.gdx:gdx:$gdxVersion"
+  api "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+  api "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
+}
+
+compileKotlin {
+  compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+}
+
+compileTestKotlin {
+  compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+}
