@@ -18,6 +18,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.JsonReader
 import com.tron3d.config.TronVisualConfig
+import com.badlogic.gdx.utils.UBJsonReader
 
 /**
  * MenuScreen con DEBUG detallado para logo 3D
@@ -97,7 +98,7 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
     private fun setupLogo3D() {
         Gdx.app.log("MenuScreen", "Configurando cámara 3D...")
         camera3D = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-        camera3D?.position?.set(0f, 10f, 25f)
+        camera3D?.position?.set(0f, 0f, 50f)  // ⬅️ Cambia a (0f, 0f, 50f) para verlo de frente y más lejos
         camera3D?.lookAt(0f, 0f, 0f)
         camera3D?.near = 0.1f
         camera3D?.far = 300f
@@ -123,8 +124,10 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         Gdx.app.log("MenuScreen", "Intentando cargar logo 3D...")
 
         try {
-            val loader = G3dModelLoader(JsonReader())
-            Gdx.app.log("MenuScreen", "Loader creado")
+
+            // ✅ CORRECTO - Usar UBJsonReader para .g3db (binario)
+            val loader = G3dModelLoader(com.badlogic.gdx.utils.UBJsonReader())
+            Gdx.app.log("MenuScreen", "Loader creado (UBJson)")
 
             logoModel = loader.loadModel(Gdx.files.internal("models/tron_logo.g3db"))
             Gdx.app.log("MenuScreen", "Modelo cargado")
@@ -143,7 +146,7 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
 
             // Posicionar y escalar
             logoInstance?.transform?.setToTranslation(0f, 0f, 0f)
-            logoInstance?.transform?.scale(1.5f, 1.5f, 1.5f)
+            logoInstance?.transform?.scale(0.3f, 0.3f, 0.3f)
             Gdx.app.log("MenuScreen", "Transform aplicado")
 
             hasLogo3D = true
@@ -161,11 +164,6 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
     override fun render(delta: Float) {
         handleInput()
 
-        if (hasLogo3D) {
-            logoRotation += 15f * delta
-            logoInstance?.transform?.setToRotation(Vector3.Y, logoRotation)
-        }
-
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
@@ -182,11 +180,17 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
 
     private fun renderLogo3D() {
         try {
-            val logoHeight = 350
+            val logoHeight = 300
+            val logoWidth = 350
+            val topMargin = 50  // ⬅️ AGREGA ESTO (margen superior en píxeles)
+
+            // Calcula la posición X para centrarlo
+            val logoX = (Gdx.graphics.width - logoWidth) / 2
+
             Gdx.gl.glViewport(
-                0,
-                Gdx.graphics.height - logoHeight,
-                Gdx.graphics.width,
+                logoX.toInt(),
+                Gdx.graphics.height - logoHeight - topMargin,  // ⬅️ RESTA EL MARGEN
+                logoWidth,
                 logoHeight
             )
 
@@ -194,6 +198,7 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
             modelBatch?.render(logoInstance, environment)
             modelBatch?.end()
 
+            // Restaura el viewport completo
             Gdx.gl.glViewport(0, 0, Gdx.graphics.width, Gdx.graphics.height)
         } catch (e: Exception) {
             Gdx.app.error("MenuScreen", "Error renderizando: ${e.message}")
@@ -238,11 +243,13 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         font.data.setScale(1.2f)
         font.color = tronOrange
 
-        val subtitle = "LIGHT CYCLE BATTLE"
+        val subtitle = ""
         val layout = com.badlogic.gdx.graphics.g2d.GlyphLayout(font, subtitle)
         val subtitleX = (Gdx.graphics.width - layout.width) / 2f
         val subtitleY = if (hasLogo3D) {
-            Gdx.graphics.height - 370f
+            val topMargin = 50  // ⬅️ MISMO VALOR
+            val logoHeight = 100  // ⬅️ MISMO VALOR
+            Gdx.graphics.height - logoHeight - topMargin - 20f  // -20f para separación extra
         } else {
             Gdx.graphics.height - 250f
         }
