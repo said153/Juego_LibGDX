@@ -14,6 +14,7 @@ import kotlin.math.sin
 /**
  * Pantalla de selección de modo multijugador
  * Diseño TRON LEGACY con hexágonos
+ * VERSIÓN ACTUALIZADA - Bluetooth habilitado
  */
 class ModeSelectionScreen(
     private val game: Tron3DGame
@@ -42,6 +43,9 @@ class ModeSelectionScreen(
     private var hoveredButton: Rectangle? = null
     private var animationTime = 0f
 
+    // Verificar si Bluetooth está disponible
+    private val bluetoothAvailable = game.isBluetoothAvailable()
+
     init {
         font.color = Color.WHITE
         font.data.setScale(2f)
@@ -61,6 +65,7 @@ class ModeSelectionScreen(
 
     override fun show() {
         Gdx.app.log("ModeSelectionScreen", "Mostrando selección de modo TRON")
+        Gdx.app.log("ModeSelectionScreen", "Bluetooth disponible: $bluetoothAvailable")
     }
 
     override fun render(delta: Float) {
@@ -162,8 +167,12 @@ class ModeSelectionScreen(
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
 
+        // Local siempre habilitado
         renderHexagonalButton(localButton, "LOCAL", tronCyan, true)
-        renderHexagonalButton(bluetoothButton, "BLUETOOTH", tronOrange, false)
+
+        // Bluetooth habilitado si está disponible
+        renderHexagonalButton(bluetoothButton, "BLUETOOTH", tronOrange, bluetoothAvailable)
+
         renderBackButton()
 
         Gdx.gl.glDisable(GL20.GL_BLEND)
@@ -213,7 +222,7 @@ class ModeSelectionScreen(
         if (!enabled) {
             font.data.setScale(1.2f)
             font.color = Color.DARK_GRAY
-            font.draw(spriteBatch, "(Próximamente)",
+            font.draw(spriteBatch, "(No disponible)",
                 button.x + button.width / 2f - 90f,
                 button.y + 25f)
         }
@@ -279,6 +288,7 @@ class ModeSelectionScreen(
 
         hoveredButton = when {
             localButton.contains(touchX, touchY) -> localButton
+            bluetoothButton.contains(touchX, touchY) && bluetoothAvailable -> bluetoothButton
             backButton.contains(touchX, touchY) -> backButton
             else -> null
         }
@@ -291,14 +301,18 @@ class ModeSelectionScreen(
 
             when {
                 localButton.contains(touchX, touchY) -> {
-                    Gdx.app.log("ModeSelectionScreen", "Multijugador Local")
+                    Gdx.app.log("ModeSelectionScreen", "Multijugador Local seleccionado")
                     game.startLocalMultiplayer()
                 }
-                bluetoothButton.contains(touchX, touchY) -> {
+                bluetoothButton.contains(touchX, touchY) && bluetoothAvailable -> {
+                    Gdx.app.log("ModeSelectionScreen", "Bluetooth seleccionado")
+                    game.startBluetoothMultiplayer()
+                }
+                bluetoothButton.contains(touchX, touchY) && !bluetoothAvailable -> {
                     Gdx.app.log("ModeSelectionScreen", "Bluetooth no disponible")
                 }
                 backButton.contains(touchX, touchY) -> {
-                    Gdx.app.log("ModeSelectionScreen", "Volver")
+                    Gdx.app.log("ModeSelectionScreen", "Volver al menú principal")
                     game.showMenu()
                 }
             }

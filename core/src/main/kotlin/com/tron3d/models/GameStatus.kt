@@ -27,7 +27,18 @@ enum class GameStatus {
     /**
      * El juego terminó - Empate (ambos chocaron al mismo tiempo)
      */
-    DRAW;
+    DRAW,
+
+    /**
+     * El juego terminó (para Bluetooth multiplayer)
+     * Usar junto con GameState.winner para determinar ganador
+     */
+    FINISHED,  // ← VALOR AGREGADO PARA BLUETOOTH
+
+    /**
+     * Esperando conexión Bluetooth
+     */
+    WAITING;  // ← VALOR AGREGADO PARA BLUETOOTH
 
     /**
      * Retorna si el juego está activo
@@ -40,7 +51,7 @@ enum class GameStatus {
      * Retorna si el juego terminó
      */
     fun isGameOver(): Boolean {
-        return this == PLAYER1_WON || this == PLAYER2_WON || this == DRAW
+        return this == PLAYER1_WON || this == PLAYER2_WON || this == DRAW || this == FINISHED
     }
 
     /**
@@ -51,8 +62,10 @@ enum class GameStatus {
             PLAYER1_WON -> "¡Jugador 1 Gana!"
             PLAYER2_WON -> "¡Jugador 2 Gana!"
             DRAW -> "¡Empate!"
+            FINISHED -> "¡Juego Terminado!"
             PLAYING -> "Jugando..."
             PAUSED -> "Pausado"
+            WAITING -> "Esperando..."
         }
     }
 }

@@ -15,6 +15,9 @@ import com.tron3d.models.Direction
 import com.tron3d.models.GameStatus
 import com.tron3d.models.LightCycle
 import com.tron3d.models.PlayerTurn
+import com.tron3d.models.ArenaModel
+import com.tron3d.network.BluetoothInterface
+import com.tron3d.network.BluetoothProtocol
 import com.tron3d.rendering.TronRenderer
 import com.tron3d.ui.GameHUD
 import com.tron3d.viewmodel.GameViewModel
@@ -27,21 +30,24 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * GameScreen 3D FUNCIONAL
- * - Vista 3D completa
- * - Cámara fija desde arriba
- * - Tablero tamaño pantalla
- * - Motos 3D con trails 3D
+ * GameScreen 3D - CON ARENA 3D PARA TODOS LOS MODOS
+ * Soporta tanto modo local como Bluetooth con sincronización
  */
 class GameScreen(
     private val game: Tron3DGame,
-    private val gameViewModel: GameViewModel
+    private val gameViewModel: GameViewModel,
+    private val isBluetooth: Boolean = false,
+    private val isHost: Boolean = false,
+    private val bluetoothManager: BluetoothInterface? = null
 ) : Screen {
 
     private lateinit var camera: PerspectiveCamera
     private lateinit var renderer: TronRenderer
     private lateinit var player1Cycle: LightCycle
     private lateinit var player2Cycle: LightCycle
+
+    // ✅ ARENA 3D para TODOS los modos
+    private var arenaModel: ArenaModel? = null
 
     private val spriteBatch: SpriteBatch = SpriteBatch()
     private val font: BitmapFont = BitmapFont()
@@ -50,11 +56,9 @@ class GameScreen(
 
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
-    // Cámara 3D FIJA - vista isométrica
     private var cameraHeight = 45f
     private var cameraDistance = 25f
 
-    // Joystick
     private val joystickRadius = 140f
     private val joystickInnerRadius = 60f
     private var joystickCenter = Vector2()
@@ -65,9 +69,10 @@ class GameScreen(
     private val tronCyan = TronVisualConfig.NeonColors.CYAN
     private val tronOrange = TronVisualConfig.NeonColors.ORANGE
 
-    // Tamaño del tablero
     private val gridWidth = 50f
     private val gridHeight = 30f
+
+    private var controlledPlayer: PlayerTurn = if (isHost) PlayerTurn.PLAYER1 else PlayerTurn.PLAYER2
 
     init {
         font.color = tronCyan
@@ -77,15 +82,8 @@ class GameScreen(
     }
 
     override fun show() {
-        // Cámara 3D perspectiva FIJA desde arriba
         camera = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-
-        // Posicionar cámara arriba mirando hacia abajo
-        camera.position.set(
-            gridWidth / 2f,
-            cameraHeight,
-            gridHeight / 2f + cameraDistance
-        )
+        camera.position.set(gridWidth / 2f, cameraHeight, gridHeight / 2f + cameraDistance)
         camera.lookAt(gridWidth / 2f, 0f, gridHeight / 2f)
         camera.near = 1f
         camera.far = 300f
@@ -93,104 +91,128 @@ class GameScreen(
 
         renderer = TronRenderer(camera)
 
-        // Crear motos 3D
-        player1Cycle = LightCycle(
-            colorNeon = tronCyan,
-            initialPosition = Vector3(10f, 0f, 15f)
-        )
+        // ✅ CARGAR ARENA 3D SIEMPRE
+        arenaModel = ArenaModel()
+        val arenaLoaded = arenaModel?.load() ?: false
 
-        player2Cycle = LightCycle(
-            colorNeon = tronOrange,
-            initialPosition = Vector3(40f, 0f, 15f)
-        )
+        if (arenaLoaded) {
+            Gdx.app.log("GameScreen", "✅ Arena 3D cargada")
+        } else {
+            Gdx.app.log("GameScreen", "⚠️ Arena no disponible, usando grid fallback")
+        }
+
+        player1Cycle = LightCycle(colorNeon = tronCyan, initialPosition = Vector3(10f, 0f, 15f))
+        player2Cycle = LightCycle(colorNeon = tronOrange, initialPosition = Vector3(40f, 0f, 15f))
 
         gameViewModel.startNewGame()
         observeGameState()
 
-        Gdx.app.log("GameScreen", "Juego 3D iniciado - Cámara FIJA")
+        // Configurar Bluetooth si es necesario
+        if (isBluetooth && bluetoothManager != null) {
+            setupBluetoothListener()
+        }
+
+        val mode = if (isBluetooth) {
+            if (isHost) "BLUETOOTH HOST (CYAN)" else "BLUETOOTH CLIENT (ORANGE)"
+        } else {
+            "LOCAL"
+        }
+        Gdx.app.log("GameScreen", "🎮 Modo: $mode - Arena 3D: ${arenaLoaded}")
+    }
+
+    private fun setupBluetoothListener() {
+        bluetoothManager?.setOnMessageReceived { message ->
+            Gdx.app.postRunnable {
+                handleBluetoothMessage(message)
+            }
+        }
+        Gdx.app.log("GameScreen", "✅ Listener Bluetooth configurado")
+    }
+
+    private fun handleBluetoothMessage(message: String) {
+        val moveData = BluetoothProtocol.parsePlayerMoveMessage(message) ?: return
+
+        if (isHost && moveData.playerNumber == 2) {
+            gameViewModel.updatePlayer2FromNetwork(moveData.position, moveData.direction, moveData.trail)
+            Gdx.app.log("GameScreen", "📥 Host recibió: P2 en (${moveData.position.x.toInt()}, ${moveData.position.y.toInt()})")
+        } else if (!isHost && moveData.playerNumber == 1) {
+            gameViewModel.updatePlayer1FromNetwork(moveData.position, moveData.direction, moveData.trail)
+            Gdx.app.log("GameScreen", "📥 Cliente recibió: P1 en (${moveData.position.x.toInt()}, ${moveData.position.y.toInt()})")
+        }
+    }
+
+    private fun sendPlayerState() {
+        if (!isBluetooth || bluetoothManager == null) return
+
+        val state = gameViewModel.gameState.value
+        val message = if (isHost) {
+            BluetoothProtocol.createPlayerMoveMessage(1, state.player1Position, state.player1Direction, state.player1Trail)
+        } else {
+            BluetoothProtocol.createPlayerMoveMessage(2, state.player2Position, state.player2Direction, state.player2Trail)
+        }
+
+        bluetoothManager.sendMessage(message)
     }
 
     private fun observeGameState() {
         coroutineScope.launch {
             gameViewModel.gameState.collect { state ->
-                // Sincronizar posiciones 3D
-                player1Cycle.position.set(
-                    state.player1Position.x,
-                    0f,  // Y = 0 (suelo)
-                    state.player1Position.y  // Z = posición Y del estado
-                )
+                player1Cycle.position.set(state.player1Position.x, 0f, state.player1Position.y)
                 player1Cycle.rotation = state.player1Direction.getRotationAngle()
-
-                player2Cycle.position.set(
-                    state.player2Position.x,
-                    0f,
-                    state.player2Position.y
-                )
+                player2Cycle.position.set(state.player2Position.x, 0f, state.player2Position.y)
                 player2Cycle.rotation = state.player2Direction.getRotationAngle()
-
-                Gdx.app.log("GameScreen", "P1: (${state.player1Position.x.toInt()}, ${state.player1Position.y.toInt()}) Dir: ${state.player1Direction}")
             }
         }
     }
 
     override fun render(delta: Float) {
         handleInput()
-
-        val state = gameViewModel.gameState.value
-
-        // Actualizar motos (para trails 3D)
         player1Cycle.update(delta)
         player2Cycle.update(delta)
 
-        // Limpiar pantalla
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
-        // Renderizar escena 3D
-        renderer.render(listOf(player1Cycle, player2Cycle))
+        // ✅ Renderizar CON ARENA 3D
+        renderer.render(listOf(player1Cycle, player2Cycle), arenaModel)
 
-        // UI 2D encima
         gameHUD.render(gameViewModel)
         renderJoystickHexagonal()
         renderMenuButton()
-        renderDebugInfo(state)
+        renderDebugInfo(gameViewModel.gameState.value)
     }
 
     private fun renderDebugInfo(state: com.tron3d.models.GameState) {
         spriteBatch.begin()
         font.color = Color.YELLOW
         font.data.setScale(1f)
-        font.draw(spriteBatch, "P1: (${state.player1Position.x.toInt()}, ${state.player1Position.y.toInt()})", 20f, 150f)
-        font.draw(spriteBatch, "P2: (${state.player2Position.x.toInt()}, ${state.player2Position.y.toInt()})", 20f, 120f)
-        font.draw(spriteBatch, "Turno: ${state.currentTurn.getDisplayName()}", 20f, 90f)
-        font.draw(spriteBatch, "Trails P1: ${player1Cycle.trailInstances.size}", 20f, 60f)
-        font.draw(spriteBatch, "Trails P2: ${player2Cycle.trailInstances.size}", 20f, 30f)
+
+        if (isBluetooth) {
+            font.draw(spriteBatch, "BLUETOOTH: ${if (isHost) "HOST" else "CLIENT"}", 20f, 180f)
+            font.draw(spriteBatch, "Control: ${if (isHost) "CYAN" else "ORANGE"}", 20f, 150f)
+        }
+
+        font.draw(spriteBatch, "P1: (${state.player1Position.x.toInt()}, ${state.player1Position.y.toInt()})", 20f, 120f)
+        font.draw(spriteBatch, "P2: (${state.player2Position.x.toInt()}, ${state.player2Position.y.toInt()})", 20f, 90f)
         spriteBatch.end()
     }
 
     private fun renderMenuButton() {
-        val state = gameViewModel.gameState.value
-
         spriteBatch.begin()
-
         font.color = Color.WHITE
         font.data.setScale(1.5f)
         font.draw(spriteBatch, "MENU", 30f, Gdx.graphics.height - 30f)
 
-        if (state.status.isGameOver()) {
+        if (gameViewModel.gameState.value.status.isGameOver()) {
             font.color = tronCyan
             font.data.setScale(2.5f)
-            font.draw(spriteBatch, "TOCA PARA CONTINUAR",
-                Gdx.graphics.width / 2f - 350f,
-                Gdx.graphics.height / 2f)
+            font.draw(spriteBatch, "TOCA PARA CONTINUAR", Gdx.graphics.width / 2f - 350f, Gdx.graphics.height / 2f)
         }
-
         spriteBatch.end()
     }
 
     private fun renderJoystickHexagonal() {
-        val state = gameViewModel.gameState.value
-        if (state.status != GameStatus.PLAYING) return
+        if (gameViewModel.gameState.value.status != GameStatus.PLAYING) return
 
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
@@ -202,7 +224,7 @@ class GameScreen(
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line)
         Gdx.gl.glLineWidth(5f)
-        shapeRenderer.color = if (state.currentTurn == PlayerTurn.PLAYER1) tronCyan else tronOrange
+        shapeRenderer.color = if (controlledPlayer == PlayerTurn.PLAYER1) tronCyan else tronOrange
         drawHexagon(joystickCenter.x, joystickCenter.y, joystickRadius, false)
         shapeRenderer.end()
 
@@ -213,7 +235,7 @@ class GameScreen(
         }
 
         shapeRenderer.color = if (joystickTouched) {
-            if (state.currentTurn == PlayerTurn.PLAYER1) tronCyan else tronOrange
+            if (controlledPlayer == PlayerTurn.PLAYER1) tronCyan else tronOrange
         } else {
             Color(0.2f, 0.5f, 0.7f, 0.7f)
         }
@@ -303,8 +325,12 @@ class GameScreen(
 
                     val direction = getJoystickDirection()
                     if (direction != null) {
-                        gameViewModel.makeMove(direction)
-                        Gdx.app.log("GameScreen", "Movimiento: $direction")
+                        if (isBluetooth) {
+                            gameViewModel.makeMoveForPlayer(direction, controlledPlayer)
+                            sendPlayerState()  // ✅ Sincronizar
+                        } else {
+                            gameViewModel.makeMove(direction)
+                        }
                     }
                 }
             }
@@ -376,6 +402,7 @@ class GameScreen(
         renderer.dispose()
         player1Cycle.dispose()
         player2Cycle.dispose()
+        arenaModel?.dispose()  // ✅ Disponer arena
         spriteBatch.dispose()
         font.dispose()
         shapeRenderer.dispose()

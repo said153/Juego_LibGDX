@@ -15,13 +15,12 @@ import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
 import com.badlogic.gdx.graphics.g3d.loader.G3dModelLoader
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
-import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.JsonReader
 import com.tron3d.config.TronVisualConfig
 import com.badlogic.gdx.utils.UBJsonReader
 
 /**
- * MenuScreen con DEBUG detallado para logo 3D
+ * MenuScreen con logo 3D - detección automática de formato
  */
 class MenuScreen(private val game: Tron3DGame) : Screen {
 
@@ -35,7 +34,6 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
     private var environment: Environment? = null
     private var logoModel: Model? = null
     private var logoInstance: ModelInstance? = null
-    private var logoRotation = 0f
     private var hasLogo3D = false
     private var errorMessage = ""
 
@@ -43,10 +41,9 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
     private val tronOrange = TronVisualConfig.NeonColors.ORANGE
 
     private val buttons = mutableListOf<MenuButton>()
-
-    private val buttonWidth = 400f
+    private val buttonWidth = 500f
     private val buttonHeight = 80f
-    private val buttonSpacing = 100f
+    private val buttonSpacing = 50f
 
     init {
         font.color = tronCyan
@@ -60,13 +57,39 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
 
     private fun setupButtons() {
         val centerX = Gdx.graphics.width / 2f
-        val startY = Gdx.graphics.height / 2f
+        val startY = Gdx.graphics.height / 2f - 50f
 
         buttons.clear()
-        buttons.add(MenuButton("MULTIJUGADOR LOCAL", centerX, startY, buttonWidth, buttonHeight))
-        buttons.add(MenuButton("UN JUGADOR (IA)", centerX, startY - buttonSpacing, buttonWidth, buttonHeight))
-        buttons.add(MenuButton("BLUETOOTH", centerX, startY - buttonSpacing * 2, buttonWidth, buttonHeight))
-        buttons.add(MenuButton("SALIR", centerX, startY - buttonSpacing * 3, buttonWidth, buttonHeight))
+
+        // Botón 1 JUGADOR (deshabilitado)
+        buttons.add(MenuButton(
+            text = "1 JUGADOR",
+            x = centerX,
+            y = startY,
+            width = buttonWidth,
+            height = buttonHeight,
+            enabled = false
+        ))
+
+        // Botón MULTIJUGADOR (habilitado)
+        buttons.add(MenuButton(
+            text = "MULTIJUGADOR",
+            x = centerX,
+            y = startY - buttonHeight - buttonSpacing,
+            width = buttonWidth,
+            height = buttonHeight,
+            enabled = true
+        ))
+
+        // Botón SALIR
+        buttons.add(MenuButton(
+            text = "SALIR",
+            x = centerX,
+            y = startY - (buttonHeight + buttonSpacing) * 2 - 50f,
+            width = 300f,
+            height = 70f,
+            enabled = true
+        ))
     }
 
     override fun show() {
@@ -98,7 +121,7 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
     private fun setupLogo3D() {
         Gdx.app.log("MenuScreen", "Configurando cámara 3D...")
         camera3D = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-        camera3D?.position?.set(0f, 0f, 50f)  // ⬅️ Cambia a (0f, 0f, 50f) para verlo de frente y más lejos
+        camera3D?.position?.set(0f, 10f, 90f)  // Posición ajustada (arriba y más cerca)
         camera3D?.lookAt(0f, 0f, 0f)
         camera3D?.near = 0.1f
         camera3D?.far = 300f
@@ -124,13 +147,26 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         Gdx.app.log("MenuScreen", "Intentando cargar logo 3D...")
 
         try {
+            // INTENTO 1: Probar con UBJsonReader (binario .g3db)
+            Gdx.app.log("MenuScreen", "Intento 1: UBJsonReader (binario)")
+            try {
+                val loaderBinary = G3dModelLoader(UBJsonReader())
+                logoModel = loaderBinary.loadModel(Gdx.files.internal("models/tron_logo.g3db"))
+                Gdx.app.log("MenuScreen", "✅ Cargado con UBJsonReader (binario)")
+            } catch (e1: Exception) {
+                Gdx.app.log("MenuScreen", "❌ UBJsonReader falló: ${e1.message}")
 
-            // ✅ CORRECTO - Usar UBJsonReader para .g3db (binario)
-            val loader = G3dModelLoader(com.badlogic.gdx.utils.UBJsonReader())
-            Gdx.app.log("MenuScreen", "Loader creado (UBJson)")
-
-            logoModel = loader.loadModel(Gdx.files.internal("models/tron_logo.g3db"))
-            Gdx.app.log("MenuScreen", "Modelo cargado")
+                // INTENTO 2: Probar con JsonReader (texto .g3dj)
+                Gdx.app.log("MenuScreen", "Intento 2: JsonReader (texto)")
+                try {
+                    val loaderText = G3dModelLoader(JsonReader())
+                    logoModel = loaderText.loadModel(Gdx.files.internal("models/tron_logo.g3db"))
+                    Gdx.app.log("MenuScreen", "✅ Cargado con JsonReader (texto)")
+                } catch (e2: Exception) {
+                    Gdx.app.error("MenuScreen", "❌ JsonReader también falló: ${e2.message}")
+                    throw e2
+                }
+            }
 
             logoInstance = ModelInstance(logoModel)
             Gdx.app.log("MenuScreen", "Instancia creada")
@@ -144,9 +180,9 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
             }
             Gdx.app.log("MenuScreen", "Materiales aplicados: $materialCount")
 
-            // Posicionar y escalar
-            logoInstance?.transform?.setToTranslation(0f, 0f, 0f)
-            logoInstance?.transform?.scale(0.3f, 0.3f, 0.3f)
+            // Posicionar y escalar - ESTÁTICO Y MÁS GRANDE
+            logoInstance?.transform?.setToTranslation(0f, 32f, 0f)  // Subir el logo (Y = 3)
+            logoInstance?.transform?.scale(0.25f, 0.25f, 0.25f)  // Mucho más grande
             Gdx.app.log("MenuScreen", "Transform aplicado")
 
             hasLogo3D = true
@@ -175,33 +211,24 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         }
 
         renderButtons()
-        renderSubtitle()
     }
 
     private fun renderLogo3D() {
         try {
-            val logoHeight = 300
-            val logoWidth = 350
-            val topMargin = 50  // ⬅️ AGREGA ESTO (margen superior en píxeles)
+            // Logo ESTÁTICO - SIN viewport limitado, ocupa toda la parte superior
 
-            // Calcula la posición X para centrarlo
-            val logoX = (Gdx.graphics.width - logoWidth) / 2
-
-            Gdx.gl.glViewport(
-                logoX.toInt(),
-                Gdx.graphics.height - logoHeight - topMargin,  // ⬅️ RESTA EL MARGEN
-                logoWidth,
-                logoHeight
-            )
+            // Habilitar depth test
+            Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
 
             modelBatch?.begin(camera3D)
             modelBatch?.render(logoInstance, environment)
             modelBatch?.end()
 
-            // Restaura el viewport completo
-            Gdx.gl.glViewport(0, 0, Gdx.graphics.width, Gdx.graphics.height)
+            // Deshabilitar depth test
+            Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
         } catch (e: Exception) {
             Gdx.app.error("MenuScreen", "Error renderizando: ${e.message}")
+            e.printStackTrace()
             hasLogo3D = false
         }
     }
@@ -211,10 +238,10 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         titleFont.color = tronCyan
         titleFont.data.setScale(5f)
 
-        val titleText = "TRON"
+        val titleText = "TRON 3D"
         val layout = com.badlogic.gdx.graphics.g2d.GlyphLayout(titleFont, titleText)
         val titleX = (Gdx.graphics.width - layout.width) / 2f
-        val titleY = Gdx.graphics.height - 100f
+        val titleY = Gdx.graphics.height - 150f
 
         titleFont.draw(spriteBatch, titleText, titleX, titleY)
         spriteBatch.end()
@@ -229,45 +256,26 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
             val errorText = "Logo 3D no cargado"
             val layout = com.badlogic.gdx.graphics.g2d.GlyphLayout(font, errorText)
             val errorX = (Gdx.graphics.width - layout.width) / 2f
-            val errorY = Gdx.graphics.height - 200f
+            val errorY = Gdx.graphics.height - 250f
 
             font.draw(spriteBatch, errorText, errorX, errorY)
-            font.draw(spriteBatch, "Ver Logcat para detalles", errorX - 100f, errorY - 30f)
+            font.draw(spriteBatch, "(Ver Logcat para detalles)", errorX - 100f, errorY - 30f)
 
             spriteBatch.end()
         }
-    }
-
-    private fun renderSubtitle() {
-        spriteBatch.begin()
-        font.data.setScale(1.2f)
-        font.color = tronOrange
-
-        val subtitle = ""
-        val layout = com.badlogic.gdx.graphics.g2d.GlyphLayout(font, subtitle)
-        val subtitleX = (Gdx.graphics.width - layout.width) / 2f
-        val subtitleY = if (hasLogo3D) {
-            val topMargin = 50  // ⬅️ MISMO VALOR
-            val logoHeight = 100  // ⬅️ MISMO VALOR
-            Gdx.graphics.height - logoHeight - topMargin - 20f  // -20f para separación extra
-        } else {
-            Gdx.graphics.height - 250f
-        }
-
-        font.draw(spriteBatch, subtitle, subtitleX, subtitleY)
-        spriteBatch.end()
     }
 
     private fun renderButtons() {
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
 
+        // Fondo de botones
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
         buttons.forEach { button ->
-            shapeRenderer.color = if (button.isHovered) {
-                Color(0.2f, 0.6f, 0.9f, 0.7f)
-            } else {
-                Color(0.05f, 0.15f, 0.3f, 0.5f)
+            shapeRenderer.color = when {
+                !button.enabled -> Color(0.2f, 0.2f, 0.2f, 0.5f)
+                button.isHovered -> Color(0.2f, 0.6f, 0.9f, 0.7f)
+                else -> Color(0.05f, 0.15f, 0.3f, 0.5f)
             }
             shapeRenderer.rect(
                 button.x - button.width / 2f,
@@ -278,13 +286,14 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         }
         shapeRenderer.end()
 
+        // Bordes de botones
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line)
         Gdx.gl.glLineWidth(4f)
         buttons.forEach { button ->
-            shapeRenderer.color = if (button.isHovered) {
-                Color.WHITE
-            } else {
-                tronCyan
+            shapeRenderer.color = when {
+                !button.enabled -> Color.DARK_GRAY
+                button.isHovered -> Color.WHITE
+                else -> tronCyan
             }
             shapeRenderer.rect(
                 button.x - button.width / 2f,
@@ -295,13 +304,14 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         }
         shapeRenderer.end()
 
+        // Texto de botones
         spriteBatch.begin()
-        font.data.setScale(1.8f)
         buttons.forEach { button ->
-            font.color = if (button.isHovered) {
-                Color.WHITE
-            } else {
-                tronCyan
+            font.data.setScale(2f)
+            font.color = when {
+                !button.enabled -> Color.DARK_GRAY
+                button.isHovered -> Color.WHITE
+                else -> tronCyan
             }
 
             val layout = com.badlogic.gdx.graphics.g2d.GlyphLayout(font, button.text)
@@ -309,6 +319,17 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
             val textY = button.y + layout.height / 2f
 
             font.draw(spriteBatch, button.text, textX, textY)
+
+            // Mostrar "(Próximamente)" para botón deshabilitado
+            if (!button.enabled) {
+                font.data.setScale(1.2f)
+                font.color = Color.GRAY
+                val subText = "(Proximamente)"
+                val subLayout = com.badlogic.gdx.graphics.g2d.GlyphLayout(font, subText)
+                val subX = button.x - subLayout.width / 2f
+                val subY = button.y - 25f
+                font.draw(spriteBatch, subText, subX, subY)
+            }
         }
         spriteBatch.end()
 
@@ -317,36 +338,31 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
 
     private fun handleInput() {
         if (Gdx.input.justTouched()) {
-            val touchX = Gdx.input.getX().toFloat()
-            val touchY = Gdx.graphics.height - Gdx.input.getY().toFloat()
+            val touchX = Gdx.input.x.toFloat()
+            val touchY = Gdx.graphics.height - Gdx.input.y.toFloat()
 
             buttons.forEach { button ->
-                if (button.contains(touchX, touchY)) {
+                if (button.enabled && button.contains(touchX, touchY)) {
                     handleButtonClick(button.text)
                 }
             }
         }
 
-        val mouseX = Gdx.input.getX().toFloat()
-        val mouseY = Gdx.graphics.height - Gdx.input.getY().toFloat()
+        val mouseX = Gdx.input.x.toFloat()
+        val mouseY = Gdx.graphics.height - Gdx.input.y.toFloat()
         buttons.forEach { button ->
-            button.isHovered = button.contains(mouseX, mouseY)
+            button.isHovered = button.enabled && button.contains(mouseX, mouseY)
         }
     }
 
     private fun handleButtonClick(buttonText: String) {
         when (buttonText) {
-            "MULTIJUGADOR LOCAL" -> {
-                Gdx.app.log("MenuScreen", "Iniciando multijugador local")
+            "1 JUGADOR" -> {
+                Gdx.app.log("MenuScreen", "1 Jugador (deshabilitado)")
+            }
+            "MULTIJUGADOR" -> {
+                Gdx.app.log("MenuScreen", "Multijugador seleccionado")
                 game.showModeSelection()
-            }
-            "UN JUGADOR (IA)" -> {
-                Gdx.app.log("MenuScreen", "Un jugador seleccionado")
-                game.startSinglePlayer()
-            }
-            "BLUETOOTH" -> {
-                Gdx.app.log("MenuScreen", "Bluetooth seleccionado")
-                game.startBluetoothMultiplayer()
             }
             "SALIR" -> {
                 Gdx.app.log("MenuScreen", "Saliendo del juego")
@@ -359,7 +375,6 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         camera3D?.viewportWidth = width.toFloat()
         camera3D?.viewportHeight = height.toFloat()
         camera3D?.update()
-
         setupButtons()
     }
 
@@ -382,6 +397,7 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
         var y: Float,
         val width: Float,
         val height: Float,
+        val enabled: Boolean = true,
         var isHovered: Boolean = false
     ) {
         fun contains(px: Float, py: Float): Boolean {

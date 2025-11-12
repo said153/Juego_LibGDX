@@ -33,7 +33,10 @@ data class GameState(
     val gridHeight: Int = 30,
 
     // Round actual
-    val currentRound: Int = 1
+    val currentRound: Int = 1,
+
+    // Ganador (para Bluetooth multiplayer)
+    val winner: String? = null  // ← CAMPO AGREGADO PARA BLUETOOTH
 ) {
     /**
      * Verifica si una posición está ocupada por algún trail
@@ -72,6 +75,14 @@ data class GameState(
         return when (status) {
             GameStatus.PLAYER1_WON -> PlayerTurn.PLAYER1
             GameStatus.PLAYER2_WON -> PlayerTurn.PLAYER2
+            GameStatus.FINISHED -> {
+                // Para compatibilidad con Bluetooth
+                when (winner) {
+                    "Jugador 1" -> PlayerTurn.PLAYER1
+                    "Jugador 2" -> PlayerTurn.PLAYER2
+                    else -> null
+                }
+            }
             else -> null
         }
     }

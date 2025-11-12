@@ -11,17 +11,18 @@ import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
 import com.badlogic.gdx.graphics.glutils.FrameBuffer
 import com.badlogic.gdx.utils.Disposable
+import com.tron3d.models.ArenaModel
 import com.tron3d.models.LightCycle
 
 /**
- * Sistema de renderizado TRON CON SUELO/GRID
+ * Sistema de renderizado TRON CON ARENA 3D PRIORIZADA
  */
 class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
 
     private val modelBatch: ModelBatch
     private val environment: Environment
 
-    // Grid/Tablero TRON
+    // Grid/Tablero TRON (fallback)
     private val floorGrid: FloorGrid
 
     // Frame buffers para efectos
@@ -30,16 +31,16 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
     init {
         modelBatch = ModelBatch()
 
-        // Crear grid del tablero
+        // Crear grid del tablero (fallback)
         floorGrid = FloorGrid(width = 50, height = 30)
 
         // Configurar entorno TRON
         environment = Environment()
-        environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.2f, 0.2f, 0.3f, 1f))
+        environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.3f, 0.3f, 0.4f, 1f))
 
         // Luz direccional principal
         val mainLight = DirectionalLight()
-        mainLight.set(Color(0.4f, 0.4f, 0.5f, 1f), -0.3f, -0.8f, -0.2f)
+        mainLight.set(Color(0.5f, 0.5f, 0.6f, 1f), -0.3f, -0.8f, -0.2f)
         environment.add(mainLight)
 
         // Luz de acento
@@ -56,15 +57,28 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
     /**
      * Renderiza una escena completa con efectos TRON
      */
-    fun render(lightCycles: List<LightCycle>) {
-        // Habilitar blending para efectos de transparencia y brillo
+    fun render(lightCycles: List<LightCycle>, arenaModel: ArenaModel? = null) {
+        // Habilitar depth test
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glDepthFunc(GL20.GL_LEQUAL)
+
+        // Habilitar blending
         Gdx.gl.glEnable(GL20.GL_BLEND)
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
 
         modelBatch.begin(camera)
 
-        // 1. Renderizar SUELO/GRID primero
-        floorGrid.render(modelBatch)
+        // ✅ 1. RENDERIZAR ARENA 3D (si está disponible)
+        if (arenaModel != null && arenaModel.isReady()) {
+            Gdx.app.log("TronRenderer", "✅ Renderizando arena 3D")
+            modelBatch.render(arenaModel.arenaInstance, environment)
+
+            // NO renderizar grid si hay arena
+        } else {
+            // Fallback: renderizar grid tradicional
+            Gdx.app.log("TronRenderer", "⚠️ Arena no disponible, usando grid")
+            floorGrid.render(modelBatch)
+        }
 
         // 2. Renderizar TRAILS con blending aditivo
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
@@ -81,6 +95,7 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
         modelBatch.end()
 
         Gdx.gl.glDisable(GL20.GL_BLEND)
+        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
     }
 
     fun resize(width: Int, height: Int) {

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * ViewModel que maneja la lógica del juego TRON
  * Controla: movimientos, colisiones, puntuación, turnos
+ * CON SOPORTE BLUETOOTH
  */
 class GameViewModel {
 
@@ -40,7 +41,8 @@ class GameViewModel {
     }
 
     /**
-     * Realiza un movimiento en la dirección especificada
+     * Realiza un movimiento en la dirección especificada (con turnos)
+     * Usado en modo local
      */
     fun makeMove(direction: Direction) {
         val state = _gameState.value
@@ -74,6 +76,38 @@ class GameViewModel {
             _gameState.value = _gameState.value.copy(
                 currentTurn = currentTurn.next()
             )
+        }
+    }
+
+    /**
+     * Hace un movimiento para un jugador específico (SIN sistema de turnos)
+     * Usado en modo Bluetooth donde cada dispositivo controla su propia moto
+     */
+    fun makeMoveForPlayer(direction: Direction, player: PlayerTurn) {
+        if (_gameState.value.status != GameStatus.PLAYING) return
+
+        val currentState = _gameState.value
+
+        when (player) {
+            PlayerTurn.PLAYER1 -> {
+                // Validar que no sea dirección opuesta
+                if (direction.isOpposite(currentState.player1Direction)) {
+                    return
+                }
+
+                // Actualizar player 1
+                updatePlayer1(direction)
+            }
+
+            PlayerTurn.PLAYER2 -> {
+                // Validar que no sea dirección opuesta
+                if (direction.isOpposite(currentState.player2Direction)) {
+                    return
+                }
+
+                // Actualizar player 2
+                updatePlayer2(direction)
+            }
         }
     }
 
@@ -213,5 +247,29 @@ class GameViewModel {
         if (state.status == GameStatus.PAUSED) {
             _gameState.value = state.copy(status = GameStatus.PLAYING)
         }
+    }
+
+    /**
+     * Actualiza posición del jugador 1 desde datos externos (Bluetooth)
+     */
+    fun updatePlayer1FromNetwork(position: Vector2, direction: Direction, trail: List<Vector2>) {
+        val state = _gameState.value
+        _gameState.value = state.copy(
+            player1Position = position,
+            player1Direction = direction,
+            player1Trail = trail
+        )
+    }
+
+    /**
+     * Actualiza posición del jugador 2 desde datos externos (Bluetooth)
+     */
+    fun updatePlayer2FromNetwork(position: Vector2, direction: Direction, trail: List<Vector2>) {
+        val state = _gameState.value
+        _gameState.value = state.copy(
+            player2Position = position,
+            player2Direction = direction,
+            player2Trail = trail
+        )
     }
 }
