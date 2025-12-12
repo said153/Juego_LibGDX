@@ -101,8 +101,19 @@ class GameScreen(
             Gdx.app.log("GameScreen", "⚠️ Arena no disponible, usando grid fallback")
         }
 
-        player1Cycle = LightCycle(colorNeon = tronCyan, initialPosition = Vector3(10f, 0f, 15f))
-        player2Cycle = LightCycle(colorNeon = tronOrange, initialPosition = Vector3(40f, 0f, 15f))
+        player1Cycle = LightCycle(
+            colorNeon = tronCyan,
+            initialPosition = Vector3(10f, 0f, 15f),
+            playerId = 1,
+            modelPath = "models/uploads_files_3392844_tron.g3db"  // ✅ Ruta correcta
+        )
+
+        player2Cycle = LightCycle(
+            colorNeon = tronOrange,
+            initialPosition = Vector3(40f, 0f, 15f),
+            playerId = 2,
+            modelPath = null  // ✅ Usa modelo simple
+        )
 
         gameViewModel.startNewGame()
         observeGameState()
@@ -308,9 +319,10 @@ class GameScreen(
 
     private fun handleJoystickInput() {
         var anyTouched = false
+        var moveExecuted = false // ✅ Flag para evitar movimientos múltiples
 
         for (i in 0 until 5) {
-            if (Gdx.input.isTouched(i)) {
+            if (Gdx.input.isTouched(i) && !moveExecuted) {
                 anyTouched = true
                 val touchX = Gdx.input.getX(i).toFloat()
                 val touchY = Gdx.graphics.height - Gdx.input.getY(i).toFloat()
@@ -325,12 +337,20 @@ class GameScreen(
 
                     val direction = getJoystickDirection()
                     if (direction != null) {
+                        // ✅ Hacer UN solo movimiento
                         if (isBluetooth) {
                             gameViewModel.makeMoveForPlayer(direction, controlledPlayer)
-                            sendPlayerState()  // ✅ Sincronizar
+                            sendPlayerState()
                         } else {
                             gameViewModel.makeMove(direction)
                         }
+
+                        moveExecuted = true // ✅ Marcar que ya se movió
+
+                        // ✅ Reset del joystick después del movimiento
+                        joystickTouched = false
+                        joystickPosition.set(joystickCenter)
+                        joystickPointer = -1
                     }
                 }
             }

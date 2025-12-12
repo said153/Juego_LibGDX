@@ -87,7 +87,7 @@ class ArenaModel : Disposable {
             // Centrada en el tablero 50x30, en Y=0 (suelo), con escala ajustable
             arenaInstance?.transform?.idt()  // Resetear transformación
             arenaInstance?.transform?.setToTranslation(25f, -5f, 15f)  // Bajar arena (Y negativo)
-            arenaInstance?.transform?.scale(0.01f, 0.01f, 0.01f)  // Hacer MUY grande para verla
+            arenaInstance?.transform?.scale(0.015f, 0.015f, 0.015f)  // Hacer MUY grande para verla
 
             isLoaded = true
             Gdx.app.log("ArenaModel", "✅ Arena cargada exitosamente")

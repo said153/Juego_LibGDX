@@ -58,38 +58,24 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
      * Renderiza una escena completa con efectos TRON
      */
     fun render(lightCycles: List<LightCycle>, arenaModel: ArenaModel? = null) {
-        // Habilitar depth test
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glDepthFunc(GL20.GL_LEQUAL)
-
-        // Habilitar blending
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
 
         modelBatch.begin(camera)
 
-        // ✅ 1. RENDERIZAR ARENA 3D (si está disponible)
+        // Renderizar arena o grid
         if (arenaModel != null && arenaModel.isReady()) {
-            Gdx.app.log("TronRenderer", "✅ Renderizando arena 3D")
             modelBatch.render(arenaModel.arenaInstance, environment)
-
-            // NO renderizar grid si hay arena
         } else {
-            // Fallback: renderizar grid tradicional
-            Gdx.app.log("TronRenderer", "⚠️ Arena no disponible, usando grid")
             floorGrid.render(modelBatch)
         }
 
-        // 2. Renderizar TRAILS con blending aditivo
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
-        lightCycles.forEach { cycle ->
-            cycle.renderTrail(modelBatch)
-        }
-
-        // 3. Renderizar MOTOS
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
-        lightCycles.forEach { cycle ->
-            modelBatch.render(cycle.instance, environment)
+        // ✅ Renderizar MOTOS (una por una para debug)
+        lightCycles.forEachIndexed { index, cycle ->
+            Gdx.app.log("TronRenderer", "🎨 Renderizando moto $index en pos: ${cycle.position}")
+            cycle.render(modelBatch, environment)
         }
 
         modelBatch.end()
