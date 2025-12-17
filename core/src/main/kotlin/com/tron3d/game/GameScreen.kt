@@ -23,6 +23,7 @@ import com.tron3d.ui.GameHUD
 import com.tron3d.viewmodel.GameViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -30,8 +31,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * GameScreen 3D - CON ARENA 3D PARA TODOS LOS MODOS
- * Soporta tanto modo local como Bluetooth con sincronización
+ * GameScreen 3D - CON ARENA 3D Y GESTOS DE ZOOM/PAN
+ * AMBAS MOTOS VISIBLES Y FUNCIONALES
  */
 class GameScreen(
     private val game: Tron3DGame,
@@ -43,6 +44,8 @@ class GameScreen(
 
     private lateinit var camera: PerspectiveCamera
     private lateinit var renderer: TronRenderer
+
+    // ✅ AMBAS MOTOS DEBEN SER VISIBLES
     private lateinit var player1Cycle: LightCycle
     private lateinit var player2Cycle: LightCycle
 
@@ -56,9 +59,26 @@ class GameScreen(
 
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
+    // Variables para gestos táctiles
+    private var firstFinger = Vector2()
+    private var secondFinger = Vector2()
+    private var isPinching = false
+    private var initialPinchDistance = 0f
+    private var lastSingleTouch = Vector2()
+    private var isDragging = false
+
+    // Variables de cámara
     private var cameraHeight = 45f
     private var cameraDistance = 25f
+    private val cameraZoomSpeed = 0.1f
+    private val cameraPanSpeed = 0.3f
+    private val cameraRotateSpeed = 0.5f
+    private val minCameraHeight = 15f
+    private val maxCameraHeight = 80f
+    private val minCameraDistance = 10f
+    private val maxCameraDistance = 50f
 
+    // Variables de joystick
     private val joystickRadius = 140f
     private val joystickInnerRadius = 60f
     private var joystickCenter = Vector2()
@@ -79,9 +99,44 @@ class GameScreen(
         font.data.setScale(1.8f)
         gameHUD = GameHUD(spriteBatch, font)
         updateJoystickPosition()
+
+        // Inicializar vectores para gestos
+        lastSingleTouch = Vector2()
+        firstFinger = Vector2()
+        secondFinger = Vector2()
     }
 
     override fun show() {
+        // Configurar cámara
+        setupCamera()
+
+        // ✅ INICIALIZAR AMBAS MOTOS
+        initializeCycles()
+
+        // Cargar arena
+        loadArena()
+
+        // Configurar juego
+        gameViewModel.startNewGame()
+        observeGameState()
+
+        // Configurar Bluetooth si es necesario
+        setupBluetoothListener()
+
+        val mode = if (isBluetooth) {
+            if (isHost) "BLUETOOTH HOST (CYAN)" else "BLUETOOTH CLIENT (ORANGE)"
+        } else {
+            "LOCAL"
+        }
+        Gdx.app.log("GameScreen", "🎮 Modo: $mode")
+        Gdx.app.log("GameScreen", "🚀 Jugador 1: ${player1Cycle.position}")
+        Gdx.app.log("GameScreen", "🚀 Jugador 2: ${player2Cycle.position}")
+    }
+
+    /**
+     * ✅ Configurar cámara
+     */
+    private fun setupCamera() {
         camera = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
         camera.position.set(gridWidth / 2f, cameraHeight, gridHeight / 2f + cameraDistance)
         camera.lookAt(gridWidth / 2f, 0f, gridHeight / 2f)
@@ -90,8 +145,40 @@ class GameScreen(
         camera.update()
 
         renderer = TronRenderer(camera)
+    }
 
-        // ✅ CARGAR ARENA 3D SIEMPRE
+    /**
+     * ✅ Inicializar ambas motos con posiciones diferentes
+     */
+    private fun initializeCycles() {
+        // Posiciones iniciales opuestas en la arena
+        val player1Start = Vector3(10f, 0f, 15f)
+        val player2Start = Vector3(40f, 0f, 15f)
+
+        // ✅ Usando solo los parámetros que existen en LightCycle
+        player1Cycle = LightCycle(
+            colorNeon = tronCyan,
+            initialPosition = player1Start,
+            playerId = 1,
+            modelPath = "models/uploads_files_3392844_tron.g3db"
+        )
+
+        player2Cycle = LightCycle(
+            colorNeon = tronOrange,
+            initialPosition = player2Start,
+            playerId = 2,
+            modelPath = "models/uploads_files_3392844_tron.g3db"
+        )
+
+        Gdx.app.log("GameScreen", "✅ Motos inicializadas:")
+        Gdx.app.log("GameScreen", "  P1 en (${player1Start.x}, ${player1Start.z})")
+        Gdx.app.log("GameScreen", "  P2 en (${player2Start.x}, ${player2Start.z})")
+    }
+
+    /**
+     * ✅ Cargar arena
+     */
+    private fun loadArena() {
         arenaModel = ArenaModel()
         val arenaLoaded = arenaModel?.load() ?: false
 
@@ -100,46 +187,44 @@ class GameScreen(
         } else {
             Gdx.app.log("GameScreen", "⚠️ Arena no disponible, usando grid fallback")
         }
-
-        player1Cycle = LightCycle(
-            colorNeon = tronCyan,
-            initialPosition = Vector3(10f, 0f, 15f),
-            playerId = 1,
-            modelPath = "models/uploads_files_3392844_tron.g3db"  // ✅ Ruta correcta
-        )
-
-        player2Cycle = LightCycle(
-            colorNeon = tronOrange,
-            initialPosition = Vector3(40f, 0f, 15f),
-            playerId = 2,
-            modelPath = null  // ✅ Usa modelo simple
-        )
-
-        gameViewModel.startNewGame()
-        observeGameState()
-
-        // Configurar Bluetooth si es necesario
-        if (isBluetooth && bluetoothManager != null) {
-            setupBluetoothListener()
-        }
-
-        val mode = if (isBluetooth) {
-            if (isHost) "BLUETOOTH HOST (CYAN)" else "BLUETOOTH CLIENT (ORANGE)"
-        } else {
-            "LOCAL"
-        }
-        Gdx.app.log("GameScreen", "🎮 Modo: $mode - Arena 3D: ${arenaLoaded}")
     }
 
-    private fun setupBluetoothListener() {
-        bluetoothManager?.setOnMessageReceived { message ->
-            Gdx.app.postRunnable {
-                handleBluetoothMessage(message)
+    /**
+     * ✅ Observar cambios en el estado del juego
+     */
+    private fun observeGameState() {
+        coroutineScope.launch {
+            gameViewModel.gameState.collect { state ->
+                // ✅ ACTUALIZAR AMBAS MOTOS - usando solo las propiedades que existen
+                player1Cycle.position.set(state.player1Position.x, 0f, state.player1Position.y)
+                player1Cycle.rotation = state.player1Direction.getRotationAngle()
+
+                player2Cycle.position.set(state.player2Position.x, 0f, state.player2Position.y)
+                player2Cycle.rotation = state.player2Direction.getRotationAngle()
+
+                // Log de depuración (simplificado - sin LOG_DEBUG)
+                Gdx.app.log("GameScreen-DEBUG", "Estado actualizado: P1(${state.player1Position.x.toInt()},${state.player1Position.y.toInt()}) P2(${state.player2Position.x.toInt()},${state.player2Position.y.toInt()})")
             }
         }
-        Gdx.app.log("GameScreen", "✅ Listener Bluetooth configurado")
     }
 
+    /**
+     * ✅ Configurar listener Bluetooth
+     */
+    private fun setupBluetoothListener() {
+        if (isBluetooth && bluetoothManager != null) {
+            bluetoothManager.setOnMessageReceived { message ->
+                Gdx.app.postRunnable {
+                    handleBluetoothMessage(message)
+                }
+            }
+            Gdx.app.log("GameScreen", "✅ Listener Bluetooth configurado")
+        }
+    }
+
+    /**
+     * ✅ Manejar mensajes Bluetooth
+     */
     private fun handleBluetoothMessage(message: String) {
         val moveData = BluetoothProtocol.parsePlayerMoveMessage(message) ?: return
 
@@ -152,6 +237,9 @@ class GameScreen(
         }
     }
 
+    /**
+     * ✅ Enviar estado del jugador por Bluetooth
+     */
     private fun sendPlayerState() {
         if (!isBluetooth || bluetoothManager == null) return
 
@@ -163,34 +251,196 @@ class GameScreen(
         }
 
         bluetoothManager.sendMessage(message)
+        Gdx.app.log("GameScreen", "📤 Estado enviado: ${if (isHost) "P1" else "P2"}")
     }
 
-    private fun observeGameState() {
-        coroutineScope.launch {
-            gameViewModel.gameState.collect { state ->
-                player1Cycle.position.set(state.player1Position.x, 0f, state.player1Position.y)
-                player1Cycle.rotation = state.player1Direction.getRotationAngle()
-                player2Cycle.position.set(state.player2Position.x, 0f, state.player2Position.y)
-                player2Cycle.rotation = state.player2Direction.getRotationAngle()
-            }
+    /**
+     * Manejar gestos táctiles para cámara
+     */
+    private fun handleCameraGestures() {
+        // Detectar gesto de pinzado (dos dedos)
+        if (Gdx.input.isTouched(0) && Gdx.input.isTouched(1)) {
+            handlePinchZoom()
+        }
+        // Detectar gesto de arrastre con un dedo (fuera del joystick)
+        else if (Gdx.input.isTouched(0) && !isJoystickAreaTouched()) {
+            handleDragPan()
+        }
+
+        // Resetear estados cuando no hay toques
+        if (!Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)) {
+            isPinching = false
+            isDragging = false
         }
     }
 
+    private fun handlePinchZoom() {
+        val currentFinger1 = Vector2(Gdx.input.getX(0).toFloat(), Gdx.input.getY(0).toFloat())
+        val currentFinger2 = Vector2(Gdx.input.getX(1).toFloat(), Gdx.input.getY(1).toFloat())
+
+        if (!isPinching) {
+            // Inicio del gesto de pinzado
+            firstFinger.set(currentFinger1)
+            secondFinger.set(currentFinger2)
+            initialPinchDistance = firstFinger.dst(secondFinger)
+            isPinching = true
+            isDragging = false
+        } else {
+            // Calcular cambio de distancia
+            val currentDistance = currentFinger1.dst(currentFinger2)
+            val zoomFactor = initialPinchDistance / currentDistance
+
+            // Aplicar zoom cambiando altura y distancia de cámara
+            cameraHeight *= zoomFactor
+            cameraDistance *= zoomFactor
+
+            // Limitar valores
+            cameraHeight = cameraHeight.coerceIn(minCameraHeight, maxCameraHeight)
+            cameraDistance = cameraDistance.coerceIn(minCameraDistance, maxCameraDistance)
+
+            // Actualizar cámara
+            updateCameraPosition()
+
+            // Actualizar distancia inicial para siguiente frame
+            initialPinchDistance = currentDistance
+        }
+    }
+
+    private fun handleDragPan() {
+        val currentTouch = Vector2(Gdx.input.getX(0).toFloat(), Gdx.input.getY(0).toFloat())
+
+        if (!isDragging) {
+            // Inicio del arrastre
+            lastSingleTouch.set(currentTouch)
+            isDragging = true
+            isPinching = false
+        } else {
+            // Calcular delta de movimiento
+            val deltaX = currentTouch.x - lastSingleTouch.x
+            val deltaY = currentTouch.y - lastSingleTouch.y
+
+            // Rotar cámara alrededor del centro de la arena
+            rotateCameraAroundCenter(deltaX, deltaY)
+
+            // Actualizar última posición
+            lastSingleTouch.set(currentTouch)
+        }
+    }
+
+    private fun rotateCameraAroundCenter(deltaX: Float, deltaY: Float) {
+        val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
+
+        // Calcular dirección actual de la cámara al centro
+        val direction = Vector3(camera.position).sub(center)
+
+        // Convertir a coordenadas esféricas
+        val radius = direction.len()
+        var theta = atan2(direction.z, direction.x).toFloat() // Ángulo en plano XZ
+        var phi = atan2(sqrt(direction.x * direction.x + direction.z * direction.z), direction.y).toFloat() // Ángulo vertical
+
+        // Aplicar rotación
+        theta -= deltaX * cameraRotateSpeed * 0.01f
+        phi -= deltaY * cameraRotateSpeed * 0.01f
+
+        // Limitar ángulo vertical
+        phi = phi.coerceIn(0.1f, 2.5f) // Evitar que pase por encima o debajo
+
+        // Convertir de vuelta a coordenadas cartesianas
+        val newX = center.x + radius * sin(phi) * cos(theta)
+        val newY = center.y + radius * cos(phi)
+        val newZ = center.z + radius * sin(phi) * sin(theta)
+
+        // Actualizar posición de la cámara
+        camera.position.set(newX, newY, newZ)
+        camera.lookAt(center)
+        camera.update()
+    }
+
+    private fun updateCameraPosition() {
+        val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
+
+        // Calcular nueva posición manteniendo el lookAt al centro
+        val direction = Vector3(camera.position).sub(center).nor()
+        val newPosition = center.cpy().add(
+            direction.x * cameraDistance,
+            cameraHeight,
+            direction.z * cameraDistance
+        )
+
+        camera.position.set(newPosition)
+        camera.lookAt(center)
+        camera.update()
+    }
+
+    /**
+     * Verificar si el toque está en el área del joystick
+     */
+    private fun isJoystickAreaTouched(): Boolean {
+        val touchX = Gdx.input.getX().toFloat()
+        val touchY = Gdx.graphics.height - Gdx.input.getY().toFloat()
+        val distance = distance(touchX, touchY, joystickCenter.x, joystickCenter.y)
+        return distance < joystickRadius * 1.5f // Área ligeramente mayor que el joystick
+    }
+
+    /**
+     * Método para resetear la vista de cámara
+     */
+    private fun resetCameraView() {
+        cameraHeight = 45f
+        cameraDistance = 25f
+        updateCameraPosition()
+    }
+
     override fun render(delta: Float) {
+        // ✅ Manejar gestos de cámara ANTES del input del juego
+        handleCameraGestures()
+
         handleInput()
+
+        // ✅ ACTUALIZAR AMBAS MOTOS
         player1Cycle.update(delta)
         player2Cycle.update(delta)
 
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
 
-        // ✅ Renderizar CON ARENA 3D
+        // ✅ RENDERIZAR AMBAS MOTOS Y LA ARENA
         renderer.render(listOf(player1Cycle, player2Cycle), arenaModel)
 
         gameHUD.render(gameViewModel)
         renderJoystickHexagonal()
         renderMenuButton()
         renderDebugInfo(gameViewModel.gameState.value)
+        renderCameraControls()
+
+        // ✅ LOGS DE DEBUG (OPCIONAL)
+        if (frameCount % 60 == 0) { // Cada 60 frames (1 segundo aprox)
+            Gdx.app.log("GameScreen-DEBUG", "=== DEBUG INFO ===")
+            Gdx.app.log("GameScreen-DEBUG", "P1: Pos=${player1Cycle.position}, Rot=${player1Cycle.rotation}")
+            Gdx.app.log("GameScreen-DEBUG", "P2: Pos=${player2Cycle.position}, Rot=${player2Cycle.rotation}")
+        }
+        frameCount++
+    }
+
+    private var frameCount = 0
+
+    /**
+     * Renderizar indicadores de controles de cámara
+     */
+    private fun renderCameraControls() {
+        spriteBatch.begin()
+        font.color = Color.LIGHT_GRAY
+        font.data.setScale(1.0f)
+
+        // Indicar controles
+        val controlsText = "Gestos: 2 dedos = Zoom | 1 dedo = Girar | Botón = Reset"
+        font.draw(spriteBatch, controlsText, 20f, Gdx.graphics.height - 60f)
+
+        // Mostrar valores de cámara
+        val cameraInfo = "Cámara: Altura=${cameraHeight.toInt()} Dist=${cameraDistance.toInt()}"
+        font.draw(spriteBatch, cameraInfo, 20f, Gdx.graphics.height - 85f)
+
+        spriteBatch.end()
     }
 
     private fun renderDebugInfo(state: com.tron3d.models.GameState) {
@@ -199,12 +449,25 @@ class GameScreen(
         font.data.setScale(1f)
 
         if (isBluetooth) {
-            font.draw(spriteBatch, "BLUETOOTH: ${if (isHost) "HOST" else "CLIENT"}", 20f, 180f)
-            font.draw(spriteBatch, "Control: ${if (isHost) "CYAN" else "ORANGE"}", 20f, 150f)
+            font.draw(spriteBatch, "BLUETOOTH: ${if (isHost) "HOST" else "CLIENT"}", 20f, 220f)
+            font.draw(spriteBatch, "Control: ${if (isHost) "CYAN" else "ORANGE"}", 20f, 190f)
         }
 
-        font.draw(spriteBatch, "P1: (${state.player1Position.x.toInt()}, ${state.player1Position.y.toInt()})", 20f, 120f)
-        font.draw(spriteBatch, "P2: (${state.player2Position.x.toInt()}, ${state.player2Position.y.toInt()})", 20f, 90f)
+        font.draw(spriteBatch, "P1: (${state.player1Position.x.toInt()}, ${state.player1Position.y.toInt()}) ${state.player1Direction}", 20f, 160f)
+        font.draw(spriteBatch, "P2: (${state.player2Position.x.toInt()}, ${state.player2Position.y.toInt()}) ${state.player2Direction}", 20f, 130f)
+
+        // ✅ Información básica de depuración
+        font.color = Color.GREEN
+        font.draw(spriteBatch, "Motos activas: P1 y P2", 20f, 100f)
+
+        // Mostrar gesto activo
+        font.color = Color.WHITE
+        if (isPinching) {
+            font.draw(spriteBatch, "ZOOM ACTIVO", 20f, 70f)
+        } else if (isDragging) {
+            font.draw(spriteBatch, "GIRO ACTIVO", 20f, 70f)
+        }
+
         spriteBatch.end()
     }
 
@@ -213,6 +476,9 @@ class GameScreen(
         font.color = Color.WHITE
         font.data.setScale(1.5f)
         font.draw(spriteBatch, "MENU", 30f, Gdx.graphics.height - 30f)
+
+        // Botón para resetear vista
+        font.draw(spriteBatch, "RESET VISTA", Gdx.graphics.width - 200f, Gdx.graphics.height - 30f)
 
         if (gameViewModel.gameState.value.status.isGameOver()) {
             font.color = tronCyan
@@ -305,21 +571,30 @@ class GameScreen(
 
         if (state.status != GameStatus.PLAYING) return
 
-        handleJoystickInput()
-
+        // Manejar clic en botón "RESET VISTA"
         if (Gdx.input.justTouched()) {
             val touchX = Gdx.input.getX().toFloat()
             val touchY = Gdx.graphics.height - Gdx.input.getY().toFloat()
 
+            // Verificar si es clic en botón "RESET VISTA"
+            if (touchX > Gdx.graphics.width - 250f && touchY > Gdx.graphics.height - 80f) {
+                resetCameraView()
+                return
+            }
+
+            // Verificar si es clic en botón "MENU"
             if (touchX < 150f && touchY > Gdx.graphics.height - 100f) {
                 game.showMenu()
+                return
             }
         }
+
+        handleJoystickInput()
     }
 
     private fun handleJoystickInput() {
         var anyTouched = false
-        var moveExecuted = false // ✅ Flag para evitar movimientos múltiples
+        var moveExecuted = false
 
         for (i in 0 until 5) {
             if (Gdx.input.isTouched(i) && !moveExecuted) {
@@ -337,17 +612,20 @@ class GameScreen(
 
                     val direction = getJoystickDirection()
                     if (direction != null) {
-                        // ✅ Hacer UN solo movimiento
+                        Gdx.app.log("GameScreen", "🎮 Movimiento: $direction para $controlledPlayer")
+
                         if (isBluetooth) {
+                            // En modo Bluetooth, cada jugador controla su propia moto
                             gameViewModel.makeMoveForPlayer(direction, controlledPlayer)
                             sendPlayerState()
                         } else {
+                            // En modo local, alternar turnos
                             gameViewModel.makeMove(direction)
                         }
 
-                        moveExecuted = true // ✅ Marcar que ya se movió
+                        moveExecuted = true
 
-                        // ✅ Reset del joystick después del movimiento
+                        // Reset del joystick después del movimiento
                         joystickTouched = false
                         joystickPosition.set(joystickCenter)
                         joystickPointer = -1
@@ -422,7 +700,7 @@ class GameScreen(
         renderer.dispose()
         player1Cycle.dispose()
         player2Cycle.dispose()
-        arenaModel?.dispose()  // ✅ Disponer arena
+        arenaModel?.dispose()
         spriteBatch.dispose()
         font.dispose()
         shapeRenderer.dispose()
