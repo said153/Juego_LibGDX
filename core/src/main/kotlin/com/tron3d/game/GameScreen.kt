@@ -78,6 +78,10 @@ class GameScreen(
     private val minCameraDistance = 10f
     private val maxCameraDistance = 50f
 
+    // ✅ NUEVAS CONSTANTES PARA LÍMITES DE ROTACIÓN
+    private val minVerticalAngle = 0.3f  // Límite superior (evitar ver desde arriba)
+    private val maxVerticalAngle = 1.5f  // Límite inferior (evitar ver desde abajo)
+
     // Variables de joystick
     private val joystickRadius = 140f
     private val joystickInnerRadius = 60f
@@ -134,17 +138,27 @@ class GameScreen(
     }
 
     /**
-     * ✅ Configurar cámara
+     * ✅ Configurar cámara con posición inicial segura
      */
     private fun setupCamera() {
         camera = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-        camera.position.set(gridWidth / 2f, cameraHeight, gridHeight / 2f + cameraDistance)
+
+        // ✅ POSICIÓN INICIAL SEGURA (evita ver el vacío)
+        camera.position.set(
+            gridWidth / 2f + 20f,  // Desplazada en X
+            cameraHeight,
+            gridHeight / 2f + cameraDistance
+        )
+
         camera.lookAt(gridWidth / 2f, 0f, gridHeight / 2f)
         camera.near = 1f
         camera.far = 300f
         camera.update()
 
         renderer = TronRenderer(camera)
+
+        // ✅ Asegurar que la cámara no esté mirando hacia abajo
+        ensureCameraSafePosition()
     }
 
     /**
@@ -304,6 +318,9 @@ class GameScreen(
             // Actualizar distancia inicial para siguiente frame
             initialPinchDistance = currentDistance
         }
+
+        // ✅ Verificar que la cámara esté en posición segura
+        ensureCameraSafePosition()
     }
 
     private fun handleDragPan() {
@@ -342,8 +359,8 @@ class GameScreen(
         theta -= deltaX * cameraRotateSpeed * 0.01f
         phi -= deltaY * cameraRotateSpeed * 0.01f
 
-        // Limitar ángulo vertical
-        phi = phi.coerceIn(0.1f, 2.5f) // Evitar que pase por encima o debajo
+        // ✅ LIMITAR ÁNGULO VERTICAL PARA EVITAR VER EL VACÍO
+        phi = phi.coerceIn(minVerticalAngle, maxVerticalAngle)
 
         // Convertir de vuelta a coordenadas cartesianas
         val newX = center.x + radius * sin(phi) * cos(theta)
@@ -359,17 +376,55 @@ class GameScreen(
     private fun updateCameraPosition() {
         val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
 
+        // Calcular dirección actual
+        val currentDirection = Vector3(camera.position).sub(center)
+        val currentRadius = currentDirection.len()
+
+        // ✅ Mantener ángulo vertical dentro de límites
+        val currentPhi = atan2(sqrt(currentDirection.x * currentDirection.x + currentDirection.z * currentDirection.z),
+            currentDirection.y).toFloat()
+        val safePhi = currentPhi.coerceIn(minVerticalAngle, maxVerticalAngle)
+
         // Calcular nueva posición manteniendo el lookAt al centro
-        val direction = Vector3(camera.position).sub(center).nor()
+        val theta = atan2(currentDirection.z, currentDirection.x).toFloat()
         val newPosition = center.cpy().add(
-            direction.x * cameraDistance,
-            cameraHeight,
-            direction.z * cameraDistance
+            currentRadius * sin(safePhi) * cos(theta),
+            currentRadius * cos(safePhi),
+            currentRadius * sin(safePhi) * sin(theta)
         )
 
         camera.position.set(newPosition)
         camera.lookAt(center)
         camera.update()
+    }
+
+    /**
+     * ✅ Asegurar que la cámara no pueda ver el vacío debajo de la arena
+     */
+    private fun ensureCameraSafePosition() {
+        val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
+        val direction = Vector3(camera.position).sub(center)
+
+        // Calcular ángulo vertical actual
+        val phi = atan2(sqrt(direction.x * direction.x + direction.z * direction.z), direction.y).toFloat()
+
+        // Si el ángulo está fuera de límites, ajustarlo
+        if (phi < minVerticalAngle || phi > maxVerticalAngle) {
+            // Ajustar a un ángulo seguro
+            val safePhi = phi.coerceIn(minVerticalAngle, maxVerticalAngle)
+
+            // Recalcular posición
+            val radius = direction.len()
+            val theta = atan2(direction.z, direction.x).toFloat()
+
+            val newX = center.x + radius * sin(safePhi) * cos(theta)
+            val newY = center.y + radius * cos(safePhi)
+            val newZ = center.z + radius * sin(safePhi) * sin(theta)
+
+            camera.position.set(newX, newY, newZ)
+            camera.lookAt(center)
+            camera.update()
+        }
     }
 
     /**
@@ -383,12 +438,27 @@ class GameScreen(
     }
 
     /**
-     * Método para resetear la vista de cámara
+     * Método para resetear la vista de cámara a posición segura
      */
     private fun resetCameraView() {
         cameraHeight = 45f
         cameraDistance = 25f
-        updateCameraPosition()
+
+        // ✅ Restablecer a posición inicial segura
+        val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
+        val safePhi = 0.7f  // Ángulo seguro intermedio
+
+        camera.position.set(
+            center.x + cameraDistance * sin(safePhi) * cos(0f),
+            center.y + cameraHeight * cos(safePhi),
+            center.z + cameraDistance * sin(safePhi) * sin(0f)
+        )
+
+        camera.lookAt(center)
+        camera.update()
+
+        // ✅ Asegurar posición segura
+        ensureCameraSafePosition()
     }
 
     override fun render(delta: Float) {
@@ -418,6 +488,12 @@ class GameScreen(
             Gdx.app.log("GameScreen-DEBUG", "=== DEBUG INFO ===")
             Gdx.app.log("GameScreen-DEBUG", "P1: Pos=${player1Cycle.position}, Rot=${player1Cycle.rotation}")
             Gdx.app.log("GameScreen-DEBUG", "P2: Pos=${player2Cycle.position}, Rot=${player2Cycle.rotation}")
+
+            // ✅ Mostrar información de cámara en logs
+            val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
+            val direction = Vector3(camera.position).sub(center)
+            val phi = Math.toDegrees(atan2(sqrt(direction.x * direction.x + direction.z * direction.z), direction.y).toDouble()).toInt()
+            Gdx.app.log("GameScreen-DEBUG", "Cámara: Ángulo=$phi°, Altura=${cameraHeight.toInt()}, Dist=${cameraDistance.toInt()}")
         }
         frameCount++
     }
@@ -440,6 +516,11 @@ class GameScreen(
         val cameraInfo = "Cámara: Altura=${cameraHeight.toInt()} Dist=${cameraDistance.toInt()}"
         font.draw(spriteBatch, cameraInfo, 20f, Gdx.graphics.height - 85f)
 
+        // ✅ Mostrar advertencia de límite
+        font.color = Color.YELLOW
+        font.data.setScale(0.8f)
+        font.draw(spriteBatch, "Límites de rotación activados", 20f, Gdx.graphics.height - 110f)
+
         spriteBatch.end()
     }
 
@@ -460,12 +541,23 @@ class GameScreen(
         font.color = Color.GREEN
         font.draw(spriteBatch, "Motos activas: P1 y P2", 20f, 100f)
 
+        // ✅ Mostrar información de cámara
+        font.color = Color.CYAN
+        val cameraPos = "Cámara: (${camera.position.x.toInt()}, ${camera.position.y.toInt()}, ${camera.position.z.toInt()})"
+        font.draw(spriteBatch, cameraPos, 20f, 70f)
+
+        // Calcular y mostrar ángulo vertical
+        val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
+        val direction = Vector3(camera.position).sub(center)
+        val phi = Math.toDegrees(atan2(sqrt(direction.x * direction.x + direction.z * direction.z), direction.y).toDouble()).toInt()
+        font.draw(spriteBatch, "Ángulo: ${phi}° (Límite: 17°-86°)", 20f, 40f)
+
         // Mostrar gesto activo
         font.color = Color.WHITE
         if (isPinching) {
-            font.draw(spriteBatch, "ZOOM ACTIVO", 20f, 70f)
+            font.draw(spriteBatch, "ZOOM ACTIVO", 20f, 10f)
         } else if (isDragging) {
-            font.draw(spriteBatch, "GIRO ACTIVO", 20f, 70f)
+            font.draw(spriteBatch, "GIRO ACTIVO", 20f, 10f)
         }
 
         spriteBatch.end()
