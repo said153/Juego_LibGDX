@@ -71,55 +71,63 @@ class LightCycle(
 
             Gdx.app.log("LightCycle", "📊 Materiales encontrados: ${instance.materials.size}")
 
-            // ✅ REMOVER NODOS NO DESEADOS (Plane y Plane.001 son los rectángulos azules)
+            // ✅ REMOVER NODOS NO DESEADOS
             val nodesToRemove = mutableListOf<com.badlogic.gdx.graphics.g3d.model.Node>()
 
             instance.nodes.forEach { node ->
                 Gdx.app.log("LightCycle", "🔍 Evaluando nodo: ${node.id}")
 
-                // Remover planos, cámaras, luces y objetos vacíos
-                if (node.id == "Plane" ||           // ← Rectángulo azul 1
-                    node.id == "Plane.001" ||       // ← Rectángulo azul 2
-                    node.id == "Camera" ||          // Cámara (no necesaria)
-                    node.id == "Spot" ||            // Luz (no necesaria)
-                    node.id == "Empty") {           // Objeto vacío (no necesario)
+                if (node.id == "Plane" ||
+                    node.id == "Plane.001" ||
+                    node.id == "Camera" ||
+                    node.id == "Spot" ||
+                    node.id == "Empty") {
 
                     Gdx.app.log("LightCycle", "🗑️ Marcando para remover: ${node.id}")
                     nodesToRemove.add(node)
                 }
             }
 
-            // Remover nodos marcados
             nodesToRemove.forEach { node ->
                 instance.nodes.removeValue(node, true)
                 Gdx.app.log("LightCycle", "✅ Nodo removido: ${node.id}")
             }
 
             Gdx.app.log("LightCycle", "🎯 Nodos restantes: ${instance.nodes.size}")
-            instance.nodes.forEach { node ->
-                Gdx.app.log("LightCycle", "   ✓ ${node.id}")
-            }
 
-            // Aplicar color neón a TODOS los materiales restantes
+            // ✅ PRESERVAR COLORES ORIGINALES + Solo añadir glow del equipo
             instance.materials.forEach { material ->
-                material.set(ColorAttribute.createDiffuse(colorNeon))
+                Gdx.app.log("LightCycle", "🎨 Procesando material: ${material.id}")
 
-                // ✅ AUMENTAR EMISIÓN para mejor visibilidad (de 0.8f a 1.5f)
+                // Obtener el color original (si existe)
+                val originalDiffuse = material.get(ColorAttribute::class.java, ColorAttribute.Diffuse)
+
+                if (originalDiffuse != null) {
+                    // ✅ MANTENER el color original tal cual
+                    Gdx.app.log("LightCycle", "   Color original: ${originalDiffuse.color}")
+                    // NO hacer nada con el diffuse, dejarlo como está
+
+                } else {
+                    // Si el material no tiene color, ponerle uno neutral
+                    material.set(ColorAttribute.createDiffuse(Color.LIGHT_GRAY))
+                    Gdx.app.log("LightCycle", "   ⚠️ Sin color original, usando gris")
+                }
+
+                // ✅ SOLO añadir emisión/glow del color del equipo (MUY SUTIL)
                 material.set(ColorAttribute.createEmissive(
-                    colorNeon.r * 1.5f,  // Más brillo
-                    colorNeon.g * 1.5f,
-                    colorNeon.b * 1.5f,
+                    colorNeon.r * 0.15f,  // Muy suave
+                    colorNeon.g * 0.15f,
+                    colorNeon.b * 0.15f,
                     1f
                 ))
             }
 
-            Gdx.app.log("LightCycle", "✅ Modelo 3D cargado exitosamente (sin planos)")
+            Gdx.app.log("LightCycle", "✅ Modelo 3D cargado (colores preservados)")
             return instance
 
         } catch (e: Exception) {
             Gdx.app.error("LightCycle", "❌ Error cargando modelo: ${e.message}")
             e.printStackTrace()
-            Gdx.app.log("LightCycle", "🔄 Fallback a modelo simple")
             return createSimpleModel()
         }
     }
@@ -199,7 +207,7 @@ class LightCycle(
     private fun updateTransform() {
         modelInstance.transform.setToTranslation(position)
         modelInstance.transform.rotate(Vector3.Y, rotation)
-        modelInstance.transform.scale(0.01f, 0.01f, 0.01f)
+        modelInstance.transform.scale(0.001f, 0.001f, 0.001f)
     }
 
     fun turnLeft() {

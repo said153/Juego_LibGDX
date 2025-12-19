@@ -34,19 +34,16 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
         // Crear grid del tablero (fallback)
         floorGrid = FloorGrid(width = 50, height = 30)
 
-        // Configurar entorno TRON
         environment = Environment()
-        environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.3f, 0.3f, 0.4f, 1f))
+        environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.9f, 0.9f, 1f, 1f))
 
-        // Luz direccional principal
         val mainLight = DirectionalLight()
-        mainLight.set(Color(0.5f, 0.5f, 0.6f, 1f), -0.3f, -0.8f, -0.2f)
+        mainLight.set(Color.WHITE, -0.3f, -0.8f, -0.2f)
         environment.add(mainLight)
 
-        // Luz de acento
-        val accentLight = DirectionalLight()
-        accentLight.set(Color(0.3f, 0.4f, 0.5f, 1f), 0.5f, -0.3f, 0.3f)
-        environment.add(accentLight)
+        val fillLight = DirectionalLight()
+        fillLight.set(Color(0.8f, 0.8f, 0.9f, 1f), 0.5f, -0.3f, 0.5f)
+        environment.add(fillLight)
 
         // Frame buffer para efectos
         val width = Gdx.graphics.width
@@ -65,16 +62,21 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
 
         modelBatch.begin(camera)
 
-        // Renderizar arena o grid
+        // Renderizar arena
         if (arenaModel != null && arenaModel.isReady()) {
+            // Piso
             modelBatch.render(arenaModel.arenaInstance, environment)
+
+            // ✅ GRADAS GENERADAS
+            arenaModel.getStands().forEach { stand ->
+                modelBatch.render(stand, environment)
+            }
         } else {
             floorGrid.render(modelBatch)
         }
 
-        // ✅ Renderizar MOTOS (una por una para debug)
+        // Renderizar motos
         lightCycles.forEachIndexed { index, cycle ->
-            Gdx.app.log("TronRenderer", "🎨 Renderizando moto $index en pos: ${cycle.position}")
             cycle.render(modelBatch, environment)
         }
 

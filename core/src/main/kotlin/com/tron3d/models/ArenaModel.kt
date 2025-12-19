@@ -1,21 +1,17 @@
 package com.tron3d.models
 
 import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.graphics.Pixmap
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
+import com.badlogic.gdx.graphics.g3d.attributes.TextureAttribute
 import com.badlogic.gdx.graphics.g3d.loader.G3dModelLoader
 import com.badlogic.gdx.graphics.g3d.utils.TextureProvider
 import com.badlogic.gdx.utils.Disposable
-import com.badlogic.gdx.utils.JsonReader
-import com.tron3d.config.TronVisualConfig
+import com.badlogic.gdx.utils.UBJsonReader
 
-/**
- * Modelo de la arena cargado desde archivo .g3db
- * Con soporte para texturas faltantes
- */
 class ArenaModel : Disposable {
 
     private var arenaModel: Model? = null
@@ -23,97 +19,99 @@ class ArenaModel : Disposable {
         private set
 
     private var isLoaded = false
-    private var placeholderTexture: Texture? = null
+    private val loadedTextures = mutableListOf<Texture>()
 
-    /**
-     * Crea textura placeholder para archivos faltantes
-     */
-    private fun createPlaceholderTexture(): Texture {
-        if (placeholderTexture == null) {
-            val pixmap = Pixmap(64, 64, Pixmap.Format.RGBA8888)
-            pixmap.setColor(
-                TronVisualConfig.NeonColors.CYAN.r * 0.3f,
-                TronVisualConfig.NeonColors.CYAN.g * 0.3f,
-                TronVisualConfig.NeonColors.CYAN.b * 0.3f,
-                1f
-            )
-            pixmap.fill()
-            placeholderTexture = Texture(pixmap)
-            pixmap.dispose()
-        }
-        return placeholderTexture!!
-    }
+    private var standsGenerator: StandsGenerator? = null
 
-    /**
-     * Carga el modelo de la arena desde archivo
-     */
     fun load(): Boolean {
         try {
-            Gdx.app.log("ArenaModel", "Cargando arena desde archivo...")
+            Gdx.app.log("ArenaModel", "🏟️ Cargando arena...")
 
-            // Crear TextureProvider que maneja texturas faltantes
             val textureProvider = object : TextureProvider {
                 override fun load(fileName: String): Texture {
-                    return try {
-                        // Intentar cargar la textura
-                        val fileHandle = Gdx.files.internal(fileName)
-                        if (fileHandle.exists()) {
-                            Gdx.app.log("ArenaModel", "✅ Textura cargada: $fileName")
-                            Texture(fileHandle)
-                        } else {
-                            Gdx.app.log("ArenaModel", "⚠️ Textura no encontrada, usando placeholder: $fileName")
-                            createPlaceholderTexture()
-                        }
-                    } catch (e: Exception) {
-                        Gdx.app.log("ArenaModel", "⚠️ Error cargando textura, usando placeholder: $fileName")
-                        createPlaceholderTexture()
-                    }
+                    throw RuntimeException("TextureProvider no usado")
                 }
             }
 
-            // El archivo es JSON texto, usar JsonReader
-            val loader = G3dModelLoader(JsonReader())
-
-            // Cargar con el TextureProvider personalizado
-            val modelData = loader.loadModelData(Gdx.files.internal("models/arena_tron.g3db"))
+            val loader = G3dModelLoader(UBJsonReader())
+            val modelData = loader.loadModelData(
+                Gdx.files.internal("models/light_cycle_arena.g3db")
+            )
             arenaModel = Model(modelData, textureProvider)
-
             arenaInstance = ModelInstance(arenaModel)
 
-            // Aplicar materiales Tron
-            applyTronMaterials()
+            // Aplicar texturas
+            loadAndApplyTextures()
 
-            // POSICIONAR Y ESCALAR LA ARENA
-            // Centrada en el tablero 50x30, en Y=0 (suelo), con escala ajustable
-            arenaInstance?.transform?.idt()  // Resetear transformación
-            arenaInstance?.transform?.setToTranslation(25f, -5f, 15f)  // Bajar arena (Y negativo)
-            arenaInstance?.transform?.scale(0.015f, 0.015f, 0.015f)  // Hacer MUY grande para verla
+            // ✅ POSICIONAR Y ESCALAR PRIMERO
+            arenaInstance?.transform?.idt()
+            arenaInstance?.transform?.setToTranslation(25f, 0f, 15f)
+            arenaInstance?.transform?.scale(0.01f, 0.01f, 0.01f)
+
+            // ✅ DEBUG: Ver límites DESPUÉS de transformación
+            val boundingBox = com.badlogic.gdx.math.collision.BoundingBox()
+            arenaInstance?.calculateBoundingBox(boundingBox)
+            val min = com.badlogic.gdx.math.Vector3()
+            val max = com.badlogic.gdx.math.Vector3()
+            boundingBox.getMin(min)
+            boundingBox.getMax(max)
+
+            Gdx.app.log("ArenaModel", "═══════════════════════════════════")
+            Gdx.app.log("ArenaModel", "📐 LÍMITES REALES DE LA ARENA:")
+            Gdx.app.log("ArenaModel", "   Min: X=${min.x} Y=${min.y} Z=${min.z}")
+            Gdx.app.log("ArenaModel", "   Max: X=${max.x} Y=${max.y} Z=${max.z}")
+            Gdx.app.log("ArenaModel", "   Ancho (X): ${max.x - min.x}")
+            Gdx.app.log("ArenaModel", "   Alto (Y): ${max.y - min.y}")
+            Gdx.app.log("ArenaModel", "   Profundidad (Z): ${max.z - min.z}")
+            Gdx.app.log("ArenaModel", "   Centro: X=${(min.x + max.x)/2} Z=${(min.z + max.z)/2}")
+            Gdx.app.log("ArenaModel", "═══════════════════════════════════")
+
+            // ✅ GENERAR GRADAS CON LOS LÍMITES REALES
+            standsGenerator = StandsGenerator()
+            standsGenerator?.generate()  // ← Sin parámetros
 
             isLoaded = true
-            Gdx.app.log("ArenaModel", "✅ Arena cargada exitosamente")
-            Gdx.app.log("ArenaModel", "Arena posicionada en (25, -5, 15) con escala 10.0")
+            Gdx.app.log("ArenaModel", "✅ Arena completa cargada")
             return true
 
         } catch (e: Exception) {
-            Gdx.app.error("ArenaModel", "❌ Error cargando arena: ${e.message}")
+            Gdx.app.error("ArenaModel", "❌ Error: ${e.message}")
             e.printStackTrace()
             isLoaded = false
             return false
         }
     }
 
-    /**
-     * Aplica colores neón a los materiales de la arena
-     */
-    private fun applyTronMaterials() {
+    fun getStands(): List<ModelInstance> {
+        return standsGenerator?.instances ?: emptyList()
+    }
+
+    private fun loadAndApplyTextures() {
+        val floorTexture = loadTexture("models/GridFloor01_DIFF.png")
+
         arenaInstance?.materials?.forEach { material ->
-            // Añadir emisión neón (sin quitar texturas existentes)
-            material.set(ColorAttribute.createEmissive(
-                TronVisualConfig.NeonColors.CYAN.r * 0.15f,
-                TronVisualConfig.NeonColors.CYAN.g * 0.15f,
-                TronVisualConfig.NeonColors.CYAN.b * 0.15f,
-                1f
-            ))
+            val name = material.id ?: ""
+            material.clear()
+
+            if (name.contains("GridFloor", ignoreCase = true)) {
+                floorTexture?.let { tex ->
+                    material.set(TextureAttribute.createDiffuse(tex))
+                    material.set(ColorAttribute.createDiffuse(Color.WHITE))
+                    material.set(ColorAttribute.createEmissive(0.1f, 0.2f, 0.3f, 1f))
+                }
+            }
+        }
+    }
+
+    private fun loadTexture(path: String): Texture? {
+        return try {
+            if (Gdx.files.internal(path).exists()) {
+                Texture(Gdx.files.internal(path)).also { loadedTextures.add(it) }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -123,8 +121,9 @@ class ArenaModel : Disposable {
         arenaModel?.dispose()
         arenaModel = null
         arenaInstance = null
-        placeholderTexture?.dispose()
-        placeholderTexture = null
+        loadedTextures.forEach { it.dispose() }
+        loadedTextures.clear()
+        standsGenerator?.dispose()
         isLoaded = false
     }
 }

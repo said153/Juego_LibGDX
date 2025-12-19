@@ -68,8 +68,8 @@ class GameScreen(
     private var isDragging = false
 
     // Variables de cámara
-    private var cameraHeight = 45f
-    private var cameraDistance = 25f
+    private var cameraHeight = 150f
+    private var cameraDistance = 150f
     private val cameraZoomSpeed = 0.1f
     private val cameraPanSpeed = 0.3f
     private val cameraRotateSpeed = 0.5f
