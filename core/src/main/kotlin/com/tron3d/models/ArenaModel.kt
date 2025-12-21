@@ -23,6 +23,10 @@ class ArenaModel : Disposable {
 
     private var standsGenerator: StandsGenerator? = null
 
+    // ✅ Sistema de colisión
+    var collider: ArenaCollider? = null
+        private set
+
     fun load(): Boolean {
         try {
             Gdx.app.log("ArenaModel", "🏟️ Cargando arena...")
@@ -40,38 +44,27 @@ class ArenaModel : Disposable {
             arenaModel = Model(modelData, textureProvider)
             arenaInstance = ModelInstance(arenaModel)
 
-            // Aplicar texturas
             loadAndApplyTextures()
 
-            // ✅ POSICIONAR Y ESCALAR PRIMERO
+            // ✅ APLICAR TRANSFORM
             arenaInstance?.transform?.idt()
             arenaInstance?.transform?.setToTranslation(25f, 0f, 15f)
             arenaInstance?.transform?.scale(0.01f, 0.01f, 0.01f)
 
-            // ✅ DEBUG: Ver límites DESPUÉS de transformación
-            val boundingBox = com.badlogic.gdx.math.collision.BoundingBox()
-            arenaInstance?.calculateBoundingBox(boundingBox)
-            val min = com.badlogic.gdx.math.Vector3()
-            val max = com.badlogic.gdx.math.Vector3()
-            boundingBox.getMin(min)
-            boundingBox.getMax(max)
+            // ✅ FORZAR RECALCULO DEL BOUNDING BOX
+            arenaInstance?.calculateTransforms()
 
-            Gdx.app.log("ArenaModel", "═══════════════════════════════════")
-            Gdx.app.log("ArenaModel", "📐 LÍMITES REALES DE LA ARENA:")
-            Gdx.app.log("ArenaModel", "   Min: X=${min.x} Y=${min.y} Z=${min.z}")
-            Gdx.app.log("ArenaModel", "   Max: X=${max.x} Y=${max.y} Z=${max.z}")
-            Gdx.app.log("ArenaModel", "   Ancho (X): ${max.x - min.x}")
-            Gdx.app.log("ArenaModel", "   Alto (Y): ${max.y - min.y}")
-            Gdx.app.log("ArenaModel", "   Profundidad (Z): ${max.z - min.z}")
-            Gdx.app.log("ArenaModel", "   Centro: X=${(min.x + max.x)/2} Z=${(min.z + max.z)/2}")
-            Gdx.app.log("ArenaModel", "═══════════════════════════════════")
+            // ✅ CREAR SISTEMA DE COLISIÓN (ahora el transform está aplicado)
+            arenaInstance?.let { instance ->
+                collider = ArenaCollider(instance)
+            }
 
-            // ✅ GENERAR GRADAS CON LOS LÍMITES REALES
+            // ✅ GENERAR GRADAS
             standsGenerator = StandsGenerator()
-            standsGenerator?.generate()  // ← Sin parámetros
+            standsGenerator?.generate(arenaInstance)
 
             isLoaded = true
-            Gdx.app.log("ArenaModel", "✅ Arena completa cargada")
+            Gdx.app.log("ArenaModel", "✅ Arena completa con colisiones")
             return true
 
         } catch (e: Exception) {

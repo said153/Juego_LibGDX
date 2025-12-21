@@ -68,8 +68,8 @@ class GameScreen(
     private var isDragging = false
 
     // Variables de cámara
-    private var cameraHeight = 150f
-    private var cameraDistance = 150f
+    private var cameraHeight = 20f
+    private var cameraDistance = 20f
     private val cameraZoomSpeed = 0.1f
     private val cameraPanSpeed = 0.3f
     private val cameraRotateSpeed = 0.5f
@@ -111,20 +111,16 @@ class GameScreen(
     }
 
     override fun show() {
-        // Configurar cámara
         setupCamera()
 
-        // ✅ INICIALIZAR AMBAS MOTOS
-        initializeCycles()
-
-        // Cargar arena
+        // ✅ CARGAR ARENA PRIMERO
         loadArena()
 
-        // Configurar juego
+        // ✅ LUEGO inicializar motos con posiciones correctas
+        initializeCycles()
+
         gameViewModel.startNewGame()
         observeGameState()
-
-        // Configurar Bluetooth si es necesario
         setupBluetoothListener()
 
         val mode = if (isBluetooth) {
@@ -136,6 +132,7 @@ class GameScreen(
         Gdx.app.log("GameScreen", "🚀 Jugador 1: ${player1Cycle.position}")
         Gdx.app.log("GameScreen", "🚀 Jugador 2: ${player2Cycle.position}")
     }
+
 
     /**
      * ✅ Configurar cámara con posición inicial segura
@@ -165,11 +162,18 @@ class GameScreen(
      * ✅ Inicializar ambas motos con posiciones diferentes
      */
     private fun initializeCycles() {
-        // Posiciones iniciales opuestas en la arena
-        val player1Start = Vector3(10f, 0f, 15f)
-        val player2Start = Vector3(40f, 0f, 15f)
+        // ✅ Obtener posiciones del collider de la arena
+        val p1Start = arenaModel?.collider?.getStartPosition(0.2f) ?: Vector2(10f, 15f)
+        val p2Start = arenaModel?.collider?.getStartPosition(0.8f) ?: Vector2(40f, 15f)
 
-        // ✅ Usando solo los parámetros que existen en LightCycle
+        // Convertir Vector2 a Vector3 (con Y=2 para que estén visibles sobre el piso)
+        val player1Start = Vector3(p1Start.x, 0f, p1Start.y)
+        val player2Start = Vector3(p2Start.x, 0f, p2Start.y)
+
+        Gdx.app.log("GameScreen", "🏍️ Posiciones calculadas:")
+        Gdx.app.log("GameScreen", "  P1: $player1Start")
+        Gdx.app.log("GameScreen", "  P2: $player2Start")
+
         player1Cycle = LightCycle(
             colorNeon = tronCyan,
             initialPosition = player1Start,
@@ -184,9 +188,7 @@ class GameScreen(
             modelPath = "models/uploads_files_3392844_tron.g3db"
         )
 
-        Gdx.app.log("GameScreen", "✅ Motos inicializadas:")
-        Gdx.app.log("GameScreen", "  P1 en (${player1Start.x}, ${player1Start.z})")
-        Gdx.app.log("GameScreen", "  P2 en (${player2Start.x}, ${player2Start.z})")
+        Gdx.app.log("GameScreen", "✅ Motos inicializadas con posiciones de la arena")
     }
 
     /**
@@ -197,9 +199,28 @@ class GameScreen(
         val arenaLoaded = arenaModel?.load() ?: false
 
         if (arenaLoaded) {
+            // ✅ Configurar límites y posiciones basándose en la arena real
+            arenaModel?.collider?.let { collider ->
+                val width = collider.getPlayableWidth()
+                val depth = collider.getPlayableDepth()
+                val p1Pos = collider.getStartPosition(0.2f)  // 20% del ancho
+                val p2Pos = collider.getStartPosition(0.8f)  // 80% del ancho
+
+                Gdx.app.log("GameScreen", "🏟️ Arena: ${width}x${depth}")
+                Gdx.app.log("GameScreen", "🏍️ P1: $p1Pos")
+                Gdx.app.log("GameScreen", "🏍️ P2: $p2Pos")
+
+                // Actualizar ViewModel con límites reales
+                gameViewModel.initializeWithArena(
+                    collider,
+                    p1Pos,
+                    p2Pos
+                )
+            }
+
             Gdx.app.log("GameScreen", "✅ Arena 3D cargada")
         } else {
-            Gdx.app.log("GameScreen", "⚠️ Arena no disponible, usando grid fallback")
+            Gdx.app.log("GameScreen", "⚠️ Arena no disponible")
         }
     }
 
@@ -209,15 +230,17 @@ class GameScreen(
     private fun observeGameState() {
         coroutineScope.launch {
             gameViewModel.gameState.collect { state ->
-                // ✅ ACTUALIZAR AMBAS MOTOS - usando solo las propiedades que existen
-                player1Cycle.position.set(state.player1Position.x, 0f, state.player1Position.y)
+                player1Cycle.position.set(state.player1Position.x, 1f, state.player1Position.y)
                 player1Cycle.rotation = state.player1Direction.getRotationAngle()
 
-                player2Cycle.position.set(state.player2Position.x, 0f, state.player2Position.y)
+                player2Cycle.position.set(state.player2Position.x, 1f, state.player2Position.y)
                 player2Cycle.rotation = state.player2Direction.getRotationAngle()
 
-                // Log de depuración (simplificado - sin LOG_DEBUG)
-                Gdx.app.log("GameScreen-DEBUG", "Estado actualizado: P1(${state.player1Position.x.toInt()},${state.player1Position.y.toInt()}) P2(${state.player2Position.x.toInt()},${state.player2Position.y.toInt()})")
+                // ✅ Limpiar trails al reiniciar
+                if (state.status == GameStatus.PLAYING && state.player1Trail.isEmpty()) {
+                    player1Cycle.clearTrail()
+                    player2Cycle.clearTrail()
+                }
             }
         }
     }

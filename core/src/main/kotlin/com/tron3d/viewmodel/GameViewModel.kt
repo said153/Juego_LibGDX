@@ -1,6 +1,8 @@
 package com.tron3d.viewmodel
 
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.math.Vector2
+import com.tron3d.models.ArenaCollider
 import com.tron3d.models.Direction
 import com.tron3d.models.GameState
 import com.tron3d.models.GameStatus
@@ -12,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * ViewModel que maneja la lógica del juego TRON
  * Controla: movimientos, colisiones, puntuación, turnos
- * CON SOPORTE BLUETOOTH
+ * CON SOPORTE BLUETOOTH Y COLISIONES AUTOMÁTICAS
  */
 class GameViewModel {
 
@@ -21,22 +23,65 @@ class GameViewModel {
 
     private val moveSpeed = 1f // Velocidad de movimiento (unidades por turno)
 
+    // ✅ Sistema de colisión de la arena
+    private var arenaCollider: ArenaCollider? = null
+
     /**
-     * Inicia un nuevo juego
+     * Inicializa el juego con la arena real
      */
-    fun startNewGame() {
+    fun initializeWithArena(
+        collider: ArenaCollider,
+        player1Start: Vector2,
+        player2Start: Vector2
+    ) {
+        arenaCollider = collider
+
+        val width = collider.getPlayableWidth().toInt()
+        val depth = collider.getPlayableDepth().toInt()
+
         _gameState.value = GameState(
-            player1Position = Vector2(10f, 15f),
-            player2Position = Vector2(40f, 15f),
+            player1Position = player1Start,
+            player2Position = player2Start,
             player1Direction = Direction.RIGHT,
             player2Direction = Direction.LEFT,
-            player1Trail = listOf(Vector2(10f, 15f)),
-            player2Trail = listOf(Vector2(40f, 15f)),
+            player1Trail = listOf(player1Start),
+            player2Trail = listOf(player2Start),
             status = GameStatus.PLAYING,
             currentTurn = PlayerTurn.PLAYER1,
             player1Score = 0,
             player2Score = 0,
-            currentRound = 1
+            currentRound = 1,
+            gridWidth = width,
+            gridHeight = depth
+        )
+
+        Gdx.app.log("GameViewModel", "✅ Juego inicializado con arena real: ${width}x${depth}")
+    }
+
+    /**
+     * Inicia un nuevo juego (fallback sin arena)
+     */
+    fun startNewGame() {
+        val p1Pos = arenaCollider?.getStartPosition(0.2f) ?: Vector2(10f, 15f)
+        val p2Pos = arenaCollider?.getStartPosition(0.8f) ?: Vector2(40f, 15f)
+
+        val width = arenaCollider?.getPlayableWidth()?.toInt() ?: 50
+        val depth = arenaCollider?.getPlayableDepth()?.toInt() ?: 30
+
+        _gameState.value = GameState(
+            player1Position = p1Pos,
+            player2Position = p2Pos,
+            player1Direction = Direction.RIGHT,
+            player2Direction = Direction.LEFT,
+            player1Trail = listOf(p1Pos),
+            player2Trail = listOf(p2Pos),
+            status = GameStatus.PLAYING,
+            currentTurn = PlayerTurn.PLAYER1,
+            player1Score = 0,
+            player2Score = 0,
+            currentRound = 1,
+            gridWidth = width,
+            gridHeight = depth
         )
     }
 
@@ -159,11 +204,19 @@ class GameViewModel {
 
     /**
      * Verifica si una posición causa colisión
+     * ✅ USA EL COLLIDER DE LA ARENA SI ESTÁ DISPONIBLE
      */
     private fun checkCollision(position: Vector2, state: GameState): Boolean {
-        // Colisión con bordes
-        if (state.isOutOfBounds(position)) {
-            return true
+        // ✅ Usar el collider de la arena si existe
+        if (arenaCollider != null) {
+            if (arenaCollider!!.isOutOfBounds(position)) {
+                return true
+            }
+        } else {
+            // Fallback al sistema antiguo
+            if (state.isOutOfBounds(position)) {
+                return true
+            }
         }
 
         // Colisión con trails (excluyendo la posición actual)
@@ -207,17 +260,21 @@ class GameViewModel {
 
     /**
      * Reinicia el round (mantiene puntuación)
+     * ✅ USA POSICIONES DE LA ARENA SI ESTÁ DISPONIBLE
      */
     fun restartRound() {
         val state = _gameState.value
 
+        val p1Pos = arenaCollider?.getStartPosition(0.2f) ?: Vector2(10f, 15f)
+        val p2Pos = arenaCollider?.getStartPosition(0.8f) ?: Vector2(40f, 15f)
+
         _gameState.value = GameState(
-            player1Position = Vector2(10f, 15f),
-            player2Position = Vector2(40f, 15f),
+            player1Position = p1Pos,
+            player2Position = p2Pos,
             player1Direction = Direction.RIGHT,
             player2Direction = Direction.LEFT,
-            player1Trail = listOf(Vector2(10f, 15f)),
-            player2Trail = listOf(Vector2(40f, 15f)),
+            player1Trail = listOf(p1Pos),
+            player2Trail = listOf(p2Pos),
             status = GameStatus.PLAYING,
             currentTurn = PlayerTurn.PLAYER1,
             player1Score = state.player1Score,
@@ -227,6 +284,8 @@ class GameViewModel {
             gridWidth = state.gridWidth,
             gridHeight = state.gridHeight
         )
+        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda")
+
     }
 
     /**

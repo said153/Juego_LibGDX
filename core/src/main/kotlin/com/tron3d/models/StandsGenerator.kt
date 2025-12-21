@@ -29,7 +29,7 @@ class StandsGenerator : Disposable {
     fun generate(arenaInstance: ModelInstance? = null) {
         Gdx.app.log("StandsGenerator", "🏟️ Generando gradas (escala 0.01)...")
 
-        crowdTexture = loadTexture("models/portal_alpha_1.png")
+        crowdTexture = loadTexture("models/image5.png")
         val modelBuilder = ModelBuilder()
 
         // ✅ Calcular dimensiones reales de la arena DESPUÉS de escalarla
@@ -63,59 +63,17 @@ class StandsGenerator : Disposable {
             Gdx.app.log("StandsGenerator", "   Ancho: $arenaWidth")
             Gdx.app.log("StandsGenerator", "   Profundidad: $arenaDepth")
             Gdx.app.log("StandsGenerator", "   Centro: ($centerX, $centerZ)")
-            Gdx.app.log("StandsGenerator", "   Min: ($arenaMinX, $arenaMinZ)")
-            Gdx.app.log("StandsGenerator", "   Max: ($arenaMaxX, $arenaMaxZ)")
         }
 
         // Distancia y tamaño de las gradas proporcional a la arena
-        val standOffset = arenaWidth * 0.25f  // 25% del ancho de la arena
-        val standDepth = arenaWidth * 0.15f   // 15% del ancho
+        val standOffset = arenaWidth * 0.25f
+        val standDepth = arenaWidth * 0.15f
 
-        Gdx.app.log("StandsGenerator", "📏 Configuración gradas:")
-        Gdx.app.log("StandsGenerator", "   Offset: $standOffset")
-        Gdx.app.log("StandsGenerator", "   Profundidad: $standDepth")
-
-        // ✅ GRADAS EN LOS 4 LADOS - ADAPTADAS AL TAMAÑO REAL
-
-        // Izquierda (X negativo)
-        createTronStand(
-            modelBuilder,
-            x = arenaMinX - standOffset,
-            z = centerZ,
-            width = standDepth,
-            length = arenaDepth * 1.3f,
-            side = "LEFT"
-        )
-
-        // Derecha (X positivo)
-        createTronStand(
-            modelBuilder,
-            x = arenaMaxX + standOffset,
-            z = centerZ,
-            width = standDepth,
-            length = arenaDepth * 1.3f,
-            side = "RIGHT"
-        )
-
-        // Atrás (Z negativo)
-        createTronStand(
-            modelBuilder,
-            x = centerX,
-            z = arenaMinZ - standOffset,
-            width = arenaWidth * 1.3f,
-            length = standDepth,
-            side = "BACK"
-        )
-
-        // Frente (Z positivo)
-        createTronStand(
-            modelBuilder,
-            x = centerX,
-            z = arenaMaxZ + standOffset,
-            width = arenaWidth * 1.3f,
-            length = standDepth,
-            side = "FRONT"
-        )
+        // ✅ GRADAS EN LOS 4 LADOS
+        createTronStand(modelBuilder, arenaMinX - standOffset, centerZ, standDepth, arenaDepth * 1.3f, "LEFT")
+        createTronStand(modelBuilder, arenaMaxX + standOffset, centerZ, standDepth, arenaDepth * 1.3f, "RIGHT")
+        createTronStand(modelBuilder, centerX, arenaMinZ - standOffset, arenaWidth * 1.3f, standDepth, "BACK")
+        createTronStand(modelBuilder, centerX, arenaMaxZ + standOffset, arenaWidth * 1.3f, standDepth, "FRONT")
 
         // Luces superiores
         createTopLights(modelBuilder, arenaMinX, arenaMaxX, arenaMinZ, arenaMaxZ, arenaWidth, arenaDepth)
@@ -197,15 +155,8 @@ class StandsGenerator : Disposable {
 
             // Bordes luminosos
             if (level > 0 && level < numLevels - 1) {
-                createEdgeLight(
-                    modelBuilder,
-                    x + offsetX,
-                    currentHeight + levelHeight * 0.9f,
-                    z + offsetZ,
-                    levelWidth,
-                    levelLength,
-                    side
-                )
+                createEdgeLight(modelBuilder, x + offsetX, currentHeight + levelHeight * 0.9f,
+                    z + offsetZ, levelWidth, levelLength, side)
             }
         }
     }
@@ -267,7 +218,7 @@ class StandsGenerator : Disposable {
         val numLightsWidth = 12
         val numLightsDepth = 8
 
-        // Luces laterales (a lo largo del eje Z)
+        // Luces laterales
         for (i in 0 until numLightsDepth) {
             val progress = i.toFloat() / (numLightsDepth - 1)
             val zPos = minZ + margin + progress * (depth - margin * 2)
@@ -276,7 +227,7 @@ class StandsGenerator : Disposable {
             createSingleLight(modelBuilder, material, maxX + margin * 0.5f, lightHeight, zPos)
         }
 
-        // Luces frontales/traseras (a lo largo del eje X)
+        // Luces frontales/traseras
         for (i in 0 until numLightsWidth) {
             val progress = i.toFloat() / (numLightsWidth - 1)
             val xPos = minX + margin + progress * (width - margin * 2)
@@ -284,8 +235,6 @@ class StandsGenerator : Disposable {
             createSingleLight(modelBuilder, material, xPos, lightHeight, minZ - margin * 0.5f)
             createSingleLight(modelBuilder, material, xPos, lightHeight, maxZ + margin * 0.5f)
         }
-
-        Gdx.app.log("StandsGenerator", "💡 ${(numLightsWidth + numLightsDepth) * 2} luces generadas")
     }
 
     private fun createSingleLight(
@@ -293,7 +242,6 @@ class StandsGenerator : Disposable {
         material: Material,
         x: Float, y: Float, z: Float
     ) {
-        // Luz (esfera brillante)
         val model = modelBuilder.createSphere(
             0.7f, 0.7f, 0.7f, 10, 10,
             material,
@@ -305,7 +253,6 @@ class StandsGenerator : Disposable {
             transform.setToTranslation(x, y, z)
         })
 
-        // Cable/soporte
         val cableMaterial = Material(
             ColorAttribute.createDiffuse(Color(0.15f, 0.25f, 0.35f, 1f)),
             ColorAttribute.createEmissive(0.03f, 0.05f, 0.08f, 1f)

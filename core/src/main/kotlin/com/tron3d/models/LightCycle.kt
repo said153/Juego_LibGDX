@@ -22,6 +22,10 @@ class LightCycle(
 
     private val modelInstance: ModelInstance
 
+    val trailSegments = mutableListOf<TrailSegment>()
+    private var lastTrailPosition: Vector3? = null
+    private val minTrailDistance = 0.5f
+
     init {
         Gdx.app.log("LightCycle", "🏍️ Inicializando moto - Player: $playerId")
         Gdx.app.log("LightCycle", "📍 Posición inicial: $initialPosition")
@@ -95,34 +99,33 @@ class LightCycle(
 
             Gdx.app.log("LightCycle", "🎯 Nodos restantes: ${instance.nodes.size}")
 
-            // ✅ PRESERVAR COLORES ORIGINALES + Solo añadir glow del equipo
+            // ✅ APLICAR COLORES DEL EQUIPO (CYAN o NARANJA)
             instance.materials.forEach { material ->
                 Gdx.app.log("LightCycle", "🎨 Procesando material: ${material.id}")
 
-                // Obtener el color original (si existe)
-                val originalDiffuse = material.get(ColorAttribute::class.java, ColorAttribute.Diffuse)
+                // ✅ Si es una rueda o material negro, mantener negro
+                if (material.id == "Material.004" ||
+                    material.id == "Material.007" ||
+                    material.id?.contains("wheel", ignoreCase = true) == true) {
 
-                if (originalDiffuse != null) {
-                    // ✅ MANTENER el color original tal cual
-                    Gdx.app.log("LightCycle", "   Color original: ${originalDiffuse.color}")
-                    // NO hacer nada con el diffuse, dejarlo como está
+                    material.set(ColorAttribute.createDiffuse(Color.BLACK))
+                    Gdx.app.log("LightCycle", "   ⚫ Rueda/detalle negro preservado")
 
                 } else {
-                    // Si el material no tiene color, ponerle uno neutral
-                    material.set(ColorAttribute.createDiffuse(Color.LIGHT_GRAY))
-                    Gdx.app.log("LightCycle", "   ⚠️ Sin color original, usando gris")
-                }
+                    // ✅ Resto del cuerpo: COLOR DEL EQUIPO (cyan o naranja)
+                    material.set(ColorAttribute.createDiffuse(colorNeon))
+                    material.set(ColorAttribute.createEmissive(
+                        colorNeon.r * 0.10f,  // ✅ Emisión fuerte para visibilidad
+                        colorNeon.g * 0.10f,
+                        colorNeon.b * 0.10f,
+                        1f
+                    ))
 
-                // ✅ SOLO añadir emisión/glow del color del equipo (MUY SUTIL)
-                material.set(ColorAttribute.createEmissive(
-                    colorNeon.r * 0.15f,  // Muy suave
-                    colorNeon.g * 0.15f,
-                    colorNeon.b * 0.15f,
-                    1f
-                ))
+                    Gdx.app.log("LightCycle", "   ✅ Color equipo aplicado: $colorNeon")
+                }
             }
 
-            Gdx.app.log("LightCycle", "✅ Modelo 3D cargado (colores preservados)")
+            Gdx.app.log("LightCycle", "✅ Modelo 3D cargado con colores del equipo")
             return instance
 
         } catch (e: Exception) {
@@ -192,6 +195,8 @@ class LightCycle(
 
     fun update(delta: Float) {
         updateTransform()
+        updateTrail()  // ✅ NUEVO
+
     }
 
     fun moveForward(distance: Float) {
@@ -207,7 +212,7 @@ class LightCycle(
     private fun updateTransform() {
         modelInstance.transform.setToTranslation(position)
         modelInstance.transform.rotate(Vector3.Y, rotation)
-        modelInstance.transform.scale(0.001f, 0.001f, 0.001f)
+        modelInstance.transform.scale(0.002f, 0.002f, 0.002f)
     }
 
     fun turnLeft() {
@@ -225,12 +230,53 @@ class LightCycle(
     }
 
     fun render(modelBatch: ModelBatch, environment: Environment) {
+        // ✅ Renderizar rastro PRIMERO (para que quede detrás)
+        trailSegments.forEach { segment ->
+            modelBatch.render(segment.modelInstance, environment)
+        }
         // ✅ SOLO renderizar el modelo, SIN glow
         modelBatch.render(modelInstance, environment)
     }
 
     fun dispose() {
+        clearTrail()
         modelInstance.model.dispose()
         Gdx.app.log("LightCycle", "🗑️ Modelo disposed")
     }
+
+    private fun updateTrail() {
+        val currentPos = Vector3(position)
+
+        if (lastTrailPosition == null) {
+            lastTrailPosition = Vector3(currentPos)
+            return
+        }
+
+        val distance = currentPos.dst(lastTrailPosition!!)
+
+        if (distance >= minTrailDistance) {
+            // Crear nuevo segmento de rastro
+            val segment = TrailSegment(
+                start = Vector3(lastTrailPosition!!),
+                end = Vector3(currentPos),
+                color = colorNeon,
+                width = 0.3f,
+                height = 2.5f
+            )
+
+            trailSegments.add(segment)
+            lastTrailPosition!!.set(currentPos)
+
+            Gdx.app.log("LightCycle", "✨ Rastro creado: ${trailSegments.size} segmentos")
+        }
+    }
+
+    // ✅ NUEVO: Limpiar rastros al reiniciar
+    fun clearTrail() {
+        trailSegments.forEach { it.dispose() }
+        trailSegments.clear()
+        lastTrailPosition = null
+        Gdx.app.log("LightCycle", "🗑️ Rastro limpiado")
+    }
+
 }
