@@ -33,6 +33,7 @@ import kotlin.math.sqrt
 /**
  * GameScreen 3D - CON ARENA 3D Y GESTOS DE ZOOM/PAN
  * AMBAS MOTOS VISIBLES Y FUNCIONALES
+ * ZOOM CON DOS DEDOS IMPLEMENTADO
  */
 class GameScreen(
     private val game: Tron3DGame,
@@ -63,9 +64,10 @@ class GameScreen(
     private var firstFinger = Vector2()
     private var secondFinger = Vector2()
     private var isPinching = false
-    private var initialPinchDistance = 0f
-    private var lastSingleTouch = Vector2()
     private var isDragging = false
+    private var initialPinchDistance = 0f
+    private var previousPinchDistance = 0f
+    private var lastSingleTouch = Vector2()
 
     // Variables de cámara
     private var cameraHeight = 20f
@@ -81,6 +83,12 @@ class GameScreen(
     // ✅ NUEVAS CONSTANTES PARA LÍMITES DE ROTACIÓN
     private val minVerticalAngle = 0.3f  // Límite superior (evitar ver desde arriba)
     private val maxVerticalAngle = 1.5f  // Límite inferior (evitar ver desde abajo)
+
+    // Variables de zoom
+    private val pinchZoomSensitivity = 0.005f
+    private val minZoomFactor = 0.5f
+    private val maxZoomFactor = 3.0f
+    private var currentZoomFactor = 1.0f
 
     // Variables de joystick
     private val joystickRadius = 140f
@@ -119,6 +127,9 @@ class GameScreen(
         // ✅ LUEGO inicializar motos con posiciones correctas
         initializeCycles()
 
+        // ✅ LIMPIAR RASTROS INMEDIATAMENTE AL INICIAR
+        clearAllTrailsImmediately()
+
         gameViewModel.startNewGame()
         observeGameState()
         setupBluetoothListener()
@@ -132,7 +143,6 @@ class GameScreen(
         Gdx.app.log("GameScreen", "🚀 Jugador 1: ${player1Cycle.position}")
         Gdx.app.log("GameScreen", "🚀 Jugador 2: ${player2Cycle.position}")
     }
-
 
     /**
      * ✅ Configurar cámara con posición inicial segura
@@ -167,12 +177,20 @@ class GameScreen(
         val p2Start = arenaModel?.collider?.getStartPosition(0.8f) ?: Vector2(40f, 15f)
 
         // Convertir Vector2 a Vector3 (con Y=2 para que estén visibles sobre el piso)
-        val player1Start = Vector3(p1Start.x, 0f, p1Start.y)
-        val player2Start = Vector3(p2Start.x, 0f, p2Start.y)
+        val player1Start = Vector3(p1Start.x, 2f, p1Start.y)
+        val player2Start = Vector3(p2Start.x, 2f, p2Start.y)
 
         Gdx.app.log("GameScreen", "🏍️ Posiciones calculadas:")
         Gdx.app.log("GameScreen", "  P1: $player1Start")
         Gdx.app.log("GameScreen", "  P2: $player2Start")
+
+        // ✅ SI LAS MOTOS YA EXISTEN, LIMPIAR SUS RASTROS PRIMERO
+        if (this::player1Cycle.isInitialized) {
+            player1Cycle.clearTrail()
+        }
+        if (this::player2Cycle.isInitialized) {
+            player2Cycle.dispose()
+        }
 
         player1Cycle = LightCycle(
             colorNeon = tronCyan,
@@ -188,7 +206,11 @@ class GameScreen(
             modelPath = "models/uploads_files_3392844_tron.g3db"
         )
 
-        Gdx.app.log("GameScreen", "✅ Motos inicializadas con posiciones de la arena")
+        // ✅ LIMPIAR RASTROS AL INICIALIZAR
+        player1Cycle.clearTrail()
+        player2Cycle.clearTrail()
+
+        Gdx.app.log("GameScreen", "✅ Motos inicializadas con posiciones de la arena (rastros limpios)")
     }
 
     /**
@@ -230,19 +252,35 @@ class GameScreen(
     private fun observeGameState() {
         coroutineScope.launch {
             gameViewModel.gameState.collect { state ->
-                player1Cycle.position.set(state.player1Position.x, 1f, state.player1Position.y)
+                player1Cycle.position.set(state.player1Position.x, 2f, state.player1Position.y)
                 player1Cycle.rotation = state.player1Direction.getRotationAngle()
 
-                player2Cycle.position.set(state.player2Position.x, 1f, state.player2Position.y)
+                player2Cycle.position.set(state.player2Position.x, 2f, state.player2Position.y)
                 player2Cycle.rotation = state.player2Direction.getRotationAngle()
 
-                // ✅ Limpiar trails al reiniciar
-                if (state.status == GameStatus.PLAYING && state.player1Trail.isEmpty()) {
-                    player1Cycle.clearTrail()
-                    player2Cycle.clearTrail()
-                }
+                // ✅ Los trails se manejan separadamente en LightCycle
             }
         }
+    }
+
+    /**
+     * ✅ Limpiar todos los trails inmediatamente (ambos lugares)
+     */
+    private fun clearAllTrailsImmediately() {
+        // ✅ Verificar que las motos estén inicializadas
+        if (!this::player1Cycle.isInitialized || !this::player2Cycle.isInitialized) {
+            Gdx.app.log("GameScreen", "⚠️ Motos no inicializadas, omitiendo limpieza")
+            return
+        }
+
+        // ✅ Limpiar en las motos 3D
+        player1Cycle.clearTrail()
+        player2Cycle.clearTrail()
+
+        // ✅ Limpiar en el ViewModel
+        gameViewModel.clearTrails()
+
+        Gdx.app.log("GameScreen", "🧹 TODOS los rastros han sido limpiados inmediatamente")
     }
 
     /**
@@ -295,58 +333,108 @@ class GameScreen(
      * Manejar gestos táctiles para cámara
      */
     private fun handleCameraGestures() {
-        // Detectar gesto de pinzado (dos dedos)
-        if (Gdx.input.isTouched(0) && Gdx.input.isTouched(1)) {
-            handlePinchZoom()
-        }
-        // Detectar gesto de arrastre con un dedo (fuera del joystick)
-        else if (Gdx.input.isTouched(0) && !isJoystickAreaTouched()) {
-            handleDragPan()
-        }
+        val touchCount = getTouchCount()
 
-        // Resetear estados cuando no hay toques
-        if (!Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)) {
-            isPinching = false
-            isDragging = false
+        when (touchCount) {
+            2 -> {
+                handlePinchZoom()
+                // Resetear arrastre cuando hay pinch
+                isDragging = false
+            }
+            1 -> {
+                // Solo manejar arrastre si no está en área del joystick
+                val touchX = Gdx.input.getX(0).toFloat()
+                val touchY = Gdx.graphics.height - Gdx.input.getY(0).toFloat()
+
+                if (!isJoystickAreaTouched(touchX, touchY)) {
+                    handleDragPan()
+                }
+            }
+            else -> {
+                // Resetear estados cuando no hay toques
+                isPinching = false
+                isDragging = false
+            }
         }
     }
 
+    /**
+     * Manejar zoom con dos dedos (pellizco)
+     */
     private fun handlePinchZoom() {
         val currentFinger1 = Vector2(Gdx.input.getX(0).toFloat(), Gdx.input.getY(0).toFloat())
         val currentFinger2 = Vector2(Gdx.input.getX(1).toFloat(), Gdx.input.getY(1).toFloat())
+
+        val currentDistance = currentFinger1.dst(currentFinger2)
 
         if (!isPinching) {
             // Inicio del gesto de pinzado
             firstFinger.set(currentFinger1)
             secondFinger.set(currentFinger2)
-            initialPinchDistance = firstFinger.dst(secondFinger)
+            initialPinchDistance = currentDistance
+            previousPinchDistance = currentDistance
             isPinching = true
             isDragging = false
         } else {
             // Calcular cambio de distancia
-            val currentDistance = currentFinger1.dst(currentFinger2)
-            val zoomFactor = initialPinchDistance / currentDistance
+            val distanceDelta = currentDistance - previousPinchDistance
 
-            // Aplicar zoom cambiando altura y distancia de cámara
-            cameraHeight *= zoomFactor
-            cameraDistance *= zoomFactor
+            // Aplicar zoom con sensibilidad ajustada
+            val zoomDelta = distanceDelta * pinchZoomSensitivity
+            currentZoomFactor -= zoomDelta
 
-            // Limitar valores
-            cameraHeight = cameraHeight.coerceIn(minCameraHeight, maxCameraHeight)
-            cameraDistance = cameraDistance.coerceIn(minCameraDistance, maxCameraDistance)
+            // Limitar el factor de zoom
+            currentZoomFactor = currentZoomFactor.coerceIn(minZoomFactor, maxZoomFactor)
 
-            // Actualizar cámara
-            updateCameraPosition()
+            // Aplicar el zoom cambiando tanto la altura como la distancia
+            applyZoomToCamera(currentZoomFactor)
 
-            // Actualizar distancia inicial para siguiente frame
-            initialPinchDistance = currentDistance
+            // Actualizar distancia para siguiente frame
+            previousPinchDistance = currentDistance
         }
 
         // ✅ Verificar que la cámara esté en posición segura
         ensureCameraSafePosition()
     }
 
+    /**
+     * Aplicar zoom a la cámara
+     */
+    private fun applyZoomToCamera(zoomFactor: Float) {
+        val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
+
+        // Calcular nueva altura y distancia basadas en el factor de zoom
+        cameraHeight = 20f * zoomFactor
+        cameraDistance = 20f * zoomFactor
+
+        // Limitar valores
+        cameraHeight = cameraHeight.coerceIn(minCameraHeight, maxCameraHeight)
+        cameraDistance = cameraDistance.coerceIn(minCameraDistance, maxCameraDistance)
+
+        // Obtener dirección actual de la cámara
+        val currentDirection = Vector3(camera.position).sub(center).nor()
+
+        // Calcular nueva posición manteniendo el lookAt al centro
+        val newPosition = center.cpy().add(
+            currentDirection.x * cameraDistance,
+            cameraHeight,
+            currentDirection.z * cameraDistance
+        )
+
+        camera.position.set(newPosition)
+        camera.lookAt(center)
+        camera.update()
+    }
+
+    /**
+     * Manejar arrastre con un dedo para rotar la cámara
+     */
     private fun handleDragPan() {
+        // Verificar que no haya dos dedos tocando (gesto de pinch)
+        if (Gdx.input.isTouched(1)) {
+            return
+        }
+
         val currentTouch = Vector2(Gdx.input.getX(0).toFloat(), Gdx.input.getY(0).toFloat())
 
         if (!isDragging) {
@@ -359,14 +447,20 @@ class GameScreen(
             val deltaX = currentTouch.x - lastSingleTouch.x
             val deltaY = currentTouch.y - lastSingleTouch.y
 
-            // Rotar cámara alrededor del centro de la arena
-            rotateCameraAroundCenter(deltaX, deltaY)
+            // Solo rotar si el movimiento es significativo (evita movimientos accidentales)
+            if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+                // Rotar cámara alrededor del centro de la arena
+                rotateCameraAroundCenter(deltaX, deltaY)
+            }
 
             // Actualizar última posición
             lastSingleTouch.set(currentTouch)
         }
     }
 
+    /**
+     * Rotar cámara alrededor del centro de la arena
+     */
     private fun rotateCameraAroundCenter(deltaX: Float, deltaY: Float) {
         val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
 
@@ -396,29 +490,17 @@ class GameScreen(
         camera.update()
     }
 
-    private fun updateCameraPosition() {
-        val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
-
-        // Calcular dirección actual
-        val currentDirection = Vector3(camera.position).sub(center)
-        val currentRadius = currentDirection.len()
-
-        // ✅ Mantener ángulo vertical dentro de límites
-        val currentPhi = atan2(sqrt(currentDirection.x * currentDirection.x + currentDirection.z * currentDirection.z),
-            currentDirection.y).toFloat()
-        val safePhi = currentPhi.coerceIn(minVerticalAngle, maxVerticalAngle)
-
-        // Calcular nueva posición manteniendo el lookAt al centro
-        val theta = atan2(currentDirection.z, currentDirection.x).toFloat()
-        val newPosition = center.cpy().add(
-            currentRadius * sin(safePhi) * cos(theta),
-            currentRadius * cos(safePhi),
-            currentRadius * sin(safePhi) * sin(theta)
-        )
-
-        camera.position.set(newPosition)
-        camera.lookAt(center)
-        camera.update()
+    /**
+     * Contar toques activos en pantalla
+     */
+    private fun getTouchCount(): Int {
+        var count = 0
+        for (i in 0 until 5) {
+            if (Gdx.input.isTouched(i)) {
+                count++
+            }
+        }
+        return count
     }
 
     /**
@@ -453,9 +535,7 @@ class GameScreen(
     /**
      * Verificar si el toque está en el área del joystick
      */
-    private fun isJoystickAreaTouched(): Boolean {
-        val touchX = Gdx.input.getX().toFloat()
-        val touchY = Gdx.graphics.height - Gdx.input.getY().toFloat()
+    private fun isJoystickAreaTouched(touchX: Float, touchY: Float): Boolean {
         val distance = distance(touchX, touchY, joystickCenter.x, joystickCenter.y)
         return distance < joystickRadius * 1.5f // Área ligeramente mayor que el joystick
     }
@@ -464,8 +544,10 @@ class GameScreen(
      * Método para resetear la vista de cámara a posición segura
      */
     private fun resetCameraView() {
-        cameraHeight = 45f
-        cameraDistance = 25f
+        // Restablecer valores de zoom
+        currentZoomFactor = 1.0f
+        cameraHeight = 20f
+        cameraDistance = 20f
 
         // ✅ Restablecer a posición inicial segura
         val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
@@ -516,7 +598,7 @@ class GameScreen(
             val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
             val direction = Vector3(camera.position).sub(center)
             val phi = Math.toDegrees(atan2(sqrt(direction.x * direction.x + direction.z * direction.z), direction.y).toDouble()).toInt()
-            Gdx.app.log("GameScreen-DEBUG", "Cámara: Ángulo=$phi°, Altura=${cameraHeight.toInt()}, Dist=${cameraDistance.toInt()}")
+            Gdx.app.log("GameScreen-DEBUG", "Cámara: Ángulo=$phi°, Altura=${cameraHeight.toInt()}, Dist=${cameraDistance.toInt()}, Zoom=${(currentZoomFactor * 100).toInt()}%")
         }
         frameCount++
     }
@@ -532,17 +614,17 @@ class GameScreen(
         font.data.setScale(1.0f)
 
         // Indicar controles
-        val controlsText = "Gestos: 2 dedos = Zoom | 1 dedo = Girar | Botón = Reset"
-        font.draw(spriteBatch, controlsText, 20f, Gdx.graphics.height - 60f)
+        val controlsText = "CONTROLES DE CÁMARA:"
+        font.draw(spriteBatch, controlsText, 20f, Gdx.graphics.height - 30f)
 
-        // Mostrar valores de cámara
-        val cameraInfo = "Cámara: Altura=${cameraHeight.toInt()} Dist=${cameraDistance.toInt()}"
-        font.draw(spriteBatch, cameraInfo, 20f, Gdx.graphics.height - 85f)
+        val zoomText = "- Zoom: 2 dedos (pellizcar/separar)"
+        font.draw(spriteBatch, zoomText, 40f, Gdx.graphics.height - 60f)
 
-        // ✅ Mostrar advertencia de límite
-        font.color = Color.YELLOW
-        font.data.setScale(0.8f)
-        font.draw(spriteBatch, "Límites de rotación activados", 20f, Gdx.graphics.height - 110f)
+        val rotateText = "- Girar: 1 dedo arrastrar"
+        font.draw(spriteBatch, rotateText, 40f, Gdx.graphics.height - 85f)
+
+        val resetText = "- Reset: Botón 'RESET VISTA'"
+        font.draw(spriteBatch, resetText, 40f, Gdx.graphics.height - 110f)
 
         spriteBatch.end()
     }
@@ -553,35 +635,43 @@ class GameScreen(
         font.data.setScale(1f)
 
         if (isBluetooth) {
-            font.draw(spriteBatch, "BLUETOOTH: ${if (isHost) "HOST" else "CLIENT"}", 20f, 220f)
-            font.draw(spriteBatch, "Control: ${if (isHost) "CYAN" else "ORANGE"}", 20f, 190f)
+            font.draw(spriteBatch, "BLUETOOTH: ${if (isHost) "HOST" else "CLIENT"}", 20f, 250f)
+            font.draw(spriteBatch, "Control: ${if (isHost) "CYAN" else "ORANGE"}", 20f, 220f)
         }
 
-        font.draw(spriteBatch, "P1: (${state.player1Position.x.toInt()}, ${state.player1Position.y.toInt()}) ${state.player1Direction}", 20f, 160f)
-        font.draw(spriteBatch, "P2: (${state.player2Position.x.toInt()}, ${state.player2Position.y.toInt()}) ${state.player2Direction}", 20f, 130f)
+        font.draw(spriteBatch, "P1: (${state.player1Position.x.toInt()}, ${state.player1Position.y.toInt()}) ${state.player1Direction}", 20f, 190f)
+        font.draw(spriteBatch, "P2: (${state.player2Position.x.toInt()}, ${state.player2Position.y.toInt()}) ${state.player2Direction}", 20f, 160f)
 
         // ✅ Información básica de depuración
         font.color = Color.GREEN
-        font.draw(spriteBatch, "Motos activas: P1 y P2", 20f, 100f)
+        font.draw(spriteBatch, "Motos activas: P1 y P2", 20f, 130f)
 
         // ✅ Mostrar información de cámara
         font.color = Color.CYAN
         val cameraPos = "Cámara: (${camera.position.x.toInt()}, ${camera.position.y.toInt()}, ${camera.position.z.toInt()})"
-        font.draw(spriteBatch, cameraPos, 20f, 70f)
+        font.draw(spriteBatch, cameraPos, 20f, 100f)
+
+        // Mostrar información de zoom
+        font.draw(spriteBatch, "Zoom: ${(currentZoomFactor * 100).toInt()}%", 20f, 70f)
 
         // Calcular y mostrar ángulo vertical
         val center = Vector3(gridWidth / 2f, 0f, gridHeight / 2f)
         val direction = Vector3(camera.position).sub(center)
         val phi = Math.toDegrees(atan2(sqrt(direction.x * direction.x + direction.z * direction.z), direction.y).toDouble()).toInt()
-        font.draw(spriteBatch, "Ángulo: ${phi}° (Límite: 17°-86°)", 20f, 40f)
+        font.draw(spriteBatch, "Ángulo: ${phi}° (Límite: ${Math.toDegrees(minVerticalAngle.toDouble()).toInt()}°-${Math.toDegrees(maxVerticalAngle.toDouble()).toInt()}°)", 20f, 40f)
+
+        // Mostrar ronda actual
+        font.color = Color.MAGENTA
+        font.draw(spriteBatch, "Ronda: ${state.currentRound}", 20f, 10f)
 
         // Mostrar gesto activo
         font.color = Color.WHITE
-        if (isPinching) {
-            font.draw(spriteBatch, "ZOOM ACTIVO", 20f, 10f)
-        } else if (isDragging) {
-            font.draw(spriteBatch, "GIRO ACTIVO", 20f, 10f)
+        val gestureInfo = when {
+            isPinching -> "ZOOM ACTIVO"
+            isDragging -> "GIRO ACTIVO"
+            else -> "GESTOS DISPONIBLES"
         }
+        font.draw(spriteBatch, gestureInfo, Gdx.graphics.width - 200f, 40f)
 
         spriteBatch.end()
     }
@@ -594,6 +684,9 @@ class GameScreen(
 
         // Botón para resetear vista
         font.draw(spriteBatch, "RESET VISTA", Gdx.graphics.width - 200f, Gdx.graphics.height - 30f)
+
+        // ✅ Botón para forzar limpieza (debugging)
+        font.draw(spriteBatch, "LIMPIAR", Gdx.graphics.width / 2 - 50f, Gdx.graphics.height - 30f)
 
         if (gameViewModel.gameState.value.status.isGameOver()) {
             font.color = tronCyan
@@ -679,7 +772,12 @@ class GameScreen(
 
         if (state.status.isGameOver()) {
             if (Gdx.input.justTouched()) {
+                // ✅ PRIMERO: Limpiar todos los rastros visuales
+                clearAllTrailsImmediately()
+
+                // ✅ SEGUNDO: Ahora reiniciar la ronda
                 gameViewModel.restartRound()
+                Gdx.app.log("GameScreen", "🔄 Ronda reiniciada con rastros limpios")
             }
             return
         }
@@ -700,6 +798,15 @@ class GameScreen(
             // Verificar si es clic en botón "MENU"
             if (touchX < 150f && touchY > Gdx.graphics.height - 100f) {
                 game.showMenu()
+                return
+            }
+
+            // ✅ Verificar si es clic en botón "LIMPIAR"
+            if (touchX > Gdx.graphics.width / 2 - 100f &&
+                touchX < Gdx.graphics.width / 2 + 100f &&
+                touchY > Gdx.graphics.height - 100f) {
+                clearAllTrailsImmediately()
+                Gdx.app.log("GameScreen", "🧹 LIMPIEZA FORZADA MANUAL")
                 return
             }
         }
@@ -813,8 +920,8 @@ class GameScreen(
 
     override fun dispose() {
         renderer.dispose()
-        player1Cycle.dispose()
-        player2Cycle.dispose()
+        if (this::player1Cycle.isInitialized) player1Cycle.dispose()
+        if (this::player2Cycle.isInitialized) player2Cycle.dispose()
         arenaModel?.dispose()
         spriteBatch.dispose()
         font.dispose()

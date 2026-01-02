@@ -86,6 +86,14 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
     }
 
+    /**
+     * ✅ Limpia todos los rastros visuales
+     */
+    fun clearTrails() {
+        // Esta función es para compatibilidad, la limpieza real se hace en LightCycle
+        Gdx.app.log("TronRenderer", "🧹 Solicitud de limpieza de rastros recibida")
+    }
+
     fun resize(width: Int, height: Int) {
         fboScene.dispose()
         fboScene = FrameBuffer(Pixmap.Format.RGBA8888, width, height, true)

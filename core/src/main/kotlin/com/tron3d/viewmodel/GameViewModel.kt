@@ -86,6 +86,24 @@ class GameViewModel {
     }
 
     /**
+     * ✅ Limpia todos los rastros de la partida anterior
+     */
+    fun clearTrails() {
+        val currentState = _gameState.value
+
+        // Crear una nueva lista con solo la posición actual (punto de inicio)
+        val newPlayer1Trail = listOf(currentState.player1Position.cpy())
+        val newPlayer2Trail = listOf(currentState.player2Position.cpy())
+
+        _gameState.value = currentState.copy(
+            player1Trail = newPlayer1Trail,
+            player2Trail = newPlayer2Trail
+        )
+
+        Gdx.app.log("GameViewModel", "🧹 Rastros limpiados en ViewModel")
+    }
+
+    /**
      * Realiza un movimiento en la dirección especificada (con turnos)
      * Usado en modo local
      */
@@ -259,7 +277,7 @@ class GameViewModel {
     }
 
     /**
-     * Reinicia el round (mantiene puntuación)
+     * Reinicia el round (mantiene puntuación) y limpia los rastros
      * ✅ USA POSICIONES DE LA ARENA SI ESTÁ DISPONIBLE
      */
     fun restartRound() {
@@ -273,8 +291,8 @@ class GameViewModel {
             player2Position = p2Pos,
             player1Direction = Direction.RIGHT,
             player2Direction = Direction.LEFT,
-            player1Trail = listOf(p1Pos),
-            player2Trail = listOf(p2Pos),
+            player1Trail = listOf(p1Pos), // ✅ Lista nueva con solo la posición inicial
+            player2Trail = listOf(p2Pos), // ✅ Lista nueva con solo la posición inicial
             status = GameStatus.PLAYING,
             currentTurn = PlayerTurn.PLAYER1,
             player1Score = state.player1Score,
@@ -284,8 +302,7 @@ class GameViewModel {
             gridWidth = state.gridWidth,
             gridHeight = state.gridHeight
         )
-        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda")
-
+        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda - Rastros limpios")
     }
 
     /**
