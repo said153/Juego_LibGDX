@@ -55,6 +55,17 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
      * Renderiza una escena completa con efectos TRON
      */
     fun render(lightCycles: List<LightCycle>, arenaModel: ArenaModel? = null) {
+        render(lightCycles, arenaModel, emptyList())
+    }
+
+    /**
+     * ✅ NUEVO: Versión sobrecargada de render que acepta objetos de debug
+     */
+    fun render(
+        lightCycles: List<LightCycle>,
+        arenaModel: ArenaModel? = null,
+        debugInstances: List<com.badlogic.gdx.graphics.g3d.ModelInstance> = emptyList()
+    ) {
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glDepthFunc(GL20.GL_LEQUAL)
         Gdx.gl.glEnable(GL20.GL_BLEND)
@@ -80,6 +91,11 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
             cycle.render(modelBatch, environment)
         }
 
+        // ✅ Renderizar objetos de debug
+        debugInstances.forEach { instance ->
+            modelBatch.render(instance, environment)
+        }
+
         modelBatch.end()
 
         Gdx.gl.glDisable(GL20.GL_BLEND)
@@ -92,6 +108,43 @@ class TronRenderer(private val camera: PerspectiveCamera) : Disposable {
     fun clearTrails() {
         // Esta función es para compatibilidad, la limpieza real se hace en LightCycle
         Gdx.app.log("TronRenderer", "🧹 Solicitud de limpieza de rastros recibida")
+    }
+
+    /**
+     * ✅ NUEVO: Métodos públicos para acceder al ModelBatch y Environment
+     * Para permitir que otros componentes rendericen en la misma escena
+     */
+    fun getModelBatch(): ModelBatch {
+        return modelBatch
+    }
+
+    fun getEnvironment(): Environment {
+        return environment
+    }
+
+    fun getCamera(): PerspectiveCamera {
+        return camera
+    }
+
+    /**
+     * ✅ NUEVO: Método para renderizar objetos de debug
+     */
+    fun renderDebug(debugInstances: List<com.badlogic.gdx.graphics.g3d.ModelInstance>) {
+        if (debugInstances.isEmpty()) return
+
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
+        Gdx.gl.glDepthFunc(GL20.GL_LEQUAL)
+        Gdx.gl.glEnable(GL20.GL_BLEND)
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+
+        modelBatch.begin(camera)
+        debugInstances.forEach { instance ->
+            modelBatch.render(instance, environment)
+        }
+        modelBatch.end()
+
+        Gdx.gl.glDisable(GL20.GL_BLEND)
+        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
     }
 
     fun resize(width: Int, height: Int) {

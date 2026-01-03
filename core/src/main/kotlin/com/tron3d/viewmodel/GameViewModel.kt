@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * ViewModel que maneja la lógica del juego TRON
  * Controla: movimientos, colisiones, puntuación, turnos
- * CON SOPORTE BLUETOOTH Y COLISIONES AUTOMÁTICAS
+ * CON SOPORTE BLUETOOTH Y COLISIONES CON SEGMENTOS
  */
 class GameViewModel {
 
@@ -26,6 +26,30 @@ class GameViewModel {
     // ✅ Sistema de colisión de la arena
     private var arenaCollider: ArenaCollider? = null
 
+    // ✅ LÍMITES REALES BASADOS EN COORDENADAS MEDIDAS
+    companion object {
+        // X min: -19.55, X max: 69.93
+        // Z min: -14.03, Z max: 24.76
+        const val REAL_MIN_X = -20f      // Redondeado hacia abajo desde -19.55
+        const val REAL_MAX_X = 70f       // Redondeado hacia arriba desde 69.93
+        const val REAL_MIN_Z = -15f      // Redondeado hacia abajo desde -14.03
+        const val REAL_MAX_Z = 25f       // Redondeado hacia arriba desde 24.76
+        const val REAL_CENTER_X = 25f    // Calculado: (70 + (-20)) / 2 = 25
+        const val REAL_CENTER_Z = 5f     // Calculado: (25 + (-15)) / 2 = 5
+
+        fun isPositionRealValid(x: Float, z: Float): Boolean {
+            return x in REAL_MIN_X..REAL_MAX_X &&
+                z in REAL_MIN_Z..REAL_MAX_Z
+        }
+
+        fun getRealStartPosition(player: PlayerTurn): Vector2 {
+            return when (player) {
+                PlayerTurn.PLAYER1 -> Vector2(15f, REAL_CENTER_Z)   // Dentro de límites reales
+                PlayerTurn.PLAYER2 -> Vector2(55f, REAL_CENTER_Z)   // Dentro de límites reales
+            }
+        }
+    }
+
     /**
      * Inicializa el juego con la arena real
      */
@@ -36,16 +60,32 @@ class GameViewModel {
     ) {
         arenaCollider = collider
 
-        val width = collider.getPlayableWidth().toInt()
-        val depth = collider.getPlayableDepth().toInt()
+        // ✅ Usar límites REALES para el grid
+        val width = (REAL_MAX_X - REAL_MIN_X).toInt()
+        val depth = (REAL_MAX_Z - REAL_MIN_Z).toInt()
+
+        // ✅ Verificar que las posiciones iniciales estén dentro de límites REALES
+        val safeP1Start = if (isPositionRealValid(player1Start.x, player1Start.y)) {
+            player1Start
+        } else {
+            Gdx.app.error("GameViewModel", "⚠️ P1 fuera de límites reales, ajustando")
+            getRealStartPosition(PlayerTurn.PLAYER1)
+        }
+
+        val safeP2Start = if (isPositionRealValid(player2Start.x, player2Start.y)) {
+            player2Start
+        } else {
+            Gdx.app.error("GameViewModel", "⚠️ P2 fuera de límites reales, ajustando")
+            getRealStartPosition(PlayerTurn.PLAYER2)
+        }
 
         _gameState.value = GameState(
-            player1Position = player1Start,
-            player2Position = player2Start,
+            player1Position = safeP1Start,
+            player2Position = safeP2Start,
             player1Direction = Direction.RIGHT,
             player2Direction = Direction.LEFT,
-            player1Trail = listOf(player1Start),
-            player2Trail = listOf(player2Start),
+            player1Trail = listOf(safeP1Start),
+            player2Trail = listOf(safeP2Start),
             status = GameStatus.PLAYING,
             currentTurn = PlayerTurn.PLAYER1,
             player1Score = 0,
@@ -55,18 +95,27 @@ class GameViewModel {
             gridHeight = depth
         )
 
-        Gdx.app.log("GameViewModel", "✅ Juego inicializado con arena real: ${width}x${depth}")
+        Gdx.app.log("GameViewModel", "✅ Juego inicializado con límites REALES: ${width}x${depth}")
+        Gdx.app.log("GameViewModel", "📏 Límites REALES: X[$REAL_MIN_X-$REAL_MAX_X] Z[$REAL_MIN_Z-$REAL_MAX_Z]")
+        Gdx.app.log("GameViewModel", "🏍️ P1: $safeP1Start")
+        Gdx.app.log("GameViewModel", "🏍️ P2: $safeP2Start")
+
+        // ✅ Mostrar información del collider
+        val bounds = collider.getBounds()
+        Gdx.app.log("GameViewModel", "🎯 ArenaCollider configurado")
+        Gdx.app.log("GameViewModel", "   Bounds: X[${bounds["minX"]}-${bounds["maxX"]}] Z[${bounds["minZ"]}-${bounds["maxZ"]}]")
+        Gdx.app.log("GameViewModel", "   Centro: (${bounds["centerX"]}, ${bounds["centerZ"]})")
     }
 
     /**
-     * Inicia un nuevo juego (fallback sin arena)
+     * Inicia un nuevo juego con límites REALES
      */
     fun startNewGame() {
-        val p1Pos = arenaCollider?.getStartPosition(0.2f) ?: Vector2(10f, 15f)
-        val p2Pos = arenaCollider?.getStartPosition(0.8f) ?: Vector2(40f, 15f)
+        val p1Pos = getRealStartPosition(PlayerTurn.PLAYER1)
+        val p2Pos = getRealStartPosition(PlayerTurn.PLAYER2)
 
-        val width = arenaCollider?.getPlayableWidth()?.toInt() ?: 50
-        val depth = arenaCollider?.getPlayableDepth()?.toInt() ?: 30
+        val width = (REAL_MAX_X - REAL_MIN_X).toInt()
+        val depth = (REAL_MAX_Z - REAL_MIN_Z).toInt()
 
         _gameState.value = GameState(
             player1Position = p1Pos,
@@ -83,6 +132,15 @@ class GameViewModel {
             gridWidth = width,
             gridHeight = depth
         )
+
+        Gdx.app.log("GameViewModel", "🎮 Nuevo juego con límites REALES")
+        Gdx.app.log("GameViewModel", "📏 Arena real: ${width}x${depth}")
+        Gdx.app.log("GameViewModel", "📍 P1: $p1Pos, P2: $p2Pos")
+
+        if (arenaCollider != null) {
+            val bounds = arenaCollider!!.getBounds()
+            Gdx.app.log("GameViewModel", "🎯 ArenaCollider disponible con ${bounds["width"]}x${bounds["depth"]}")
+        }
     }
 
     /**
@@ -182,9 +240,21 @@ class GameViewModel {
             state.player1Position.y + movement.second * moveSpeed
         )
 
+        Gdx.app.log("Movement", "P1 desde (${state.player1Position.x}, ${state.player1Position.y}) → (${newPosition.x}, ${newPosition.y})")
+        Gdx.app.log("Movement-DETAIL", "P1 dirección: $newDirection, movimiento: $movement")
+
         // Verificar colisión
         if (checkCollision(newPosition, state)) {
+            Gdx.app.error("Collision", "🚫🚫 P1 PERDIÓ por colisión en: (${newPosition.x}, ${newPosition.y})")
             endRound(PlayerTurn.PLAYER2) // Player 1 perdió
+            return
+        }
+
+        // ✅ VERIFICACIÓN FINAL: Asegurar que la posición sea válida
+        if (!isPositionRealValid(newPosition.x, newPosition.y)) {
+            Gdx.app.error("Collision", "❌ P1 FUERA DE LÍMITES REALES!")
+            Gdx.app.error("Collision", "   Posición: (${newPosition.x}, ${newPosition.y})")
+            endRound(PlayerTurn.PLAYER2)
             return
         }
 
@@ -195,6 +265,8 @@ class GameViewModel {
             player1Direction = newDirection,
             player1Trail = newTrail
         )
+
+        Gdx.app.log("Movement", "✅ P1 movido a: (${newPosition.x}, ${newPosition.y})")
     }
 
     private fun updatePlayer2(newDirection: Direction) {
@@ -205,9 +277,21 @@ class GameViewModel {
             state.player2Position.y + movement.second * moveSpeed
         )
 
+        Gdx.app.log("Movement", "P2 desde (${state.player2Position.x}, ${state.player2Position.y}) → (${newPosition.x}, ${newPosition.y})")
+        Gdx.app.log("Movement-DETAIL", "P2 dirección: $newDirection, movimiento: $movement")
+
         // Verificar colisión
         if (checkCollision(newPosition, state)) {
+            Gdx.app.error("Collision", "🚫🚫 P2 PERDIÓ por colisión en: (${newPosition.x}, ${newPosition.y})")
             endRound(PlayerTurn.PLAYER1) // Player 2 perdió
+            return
+        }
+
+        // ✅ VERIFICACIÓN FINAL: Asegurar que la posición sea válida
+        if (!isPositionRealValid(newPosition.x, newPosition.y)) {
+            Gdx.app.error("Collision", "❌ P2 FUERA DE LÍMITES REALES!")
+            Gdx.app.error("Collision", "   Posición: (${newPosition.x}, ${newPosition.y})")
+            endRound(PlayerTurn.PLAYER1)
             return
         }
 
@@ -218,30 +302,58 @@ class GameViewModel {
             player2Direction = newDirection,
             player2Trail = newTrail
         )
+
+        Gdx.app.log("Movement", "✅ P2 movido a: (${newPosition.x}, ${newPosition.y})")
     }
 
     /**
      * Verifica si una posición causa colisión
-     * ✅ USA EL COLLIDER DE LA ARENA SI ESTÁ DISPONIBLE
+     * ✅ VERIFICACIÓN CON SEGMENTOS DE ARENA + TRAILS
      */
     private fun checkCollision(position: Vector2, state: GameState): Boolean {
-        // ✅ Usar el collider de la arena si existe
+        val x = position.x
+        val z = position.y
+
+        // ✅ 1. PRIMERO verificar con el ArenaCollider (segmentos)
         if (arenaCollider != null) {
-            if (arenaCollider!!.isOutOfBounds(position)) {
+            Gdx.app.log("Collision-DEBUG", "🔍 Verificando: (${"%.2f".format(x)}, ${"%.2f".format(z)})")
+
+            val isOutOfBounds = arenaCollider!!.isOutOfBounds(position)
+
+            if (isOutOfBounds) {
+                Gdx.app.error("Collision", "🚫 COLISIÓN CON ARENA en: (${"%.2f".format(x)}, ${"%.2f".format(z)})")
+
+                // Debug adicional: mostrar punto más cercano válido
+                val closest = arenaCollider!!.getClosestValidPoint(position)
+                Gdx.app.error("Collision", "   Punto válido más cercano: (${"%.2f".format(closest.x)}, ${"%.2f".format(closest.y)})")
+
                 return true
+            } else {
+                Gdx.app.log("Collision-DEBUG", "✅ Dentro de los límites de la arena")
             }
         } else {
-            // Fallback al sistema antiguo
-            if (state.isOutOfBounds(position)) {
+            // ✅ 2. Fallback: verificación de bounding box
+            Gdx.app.log("Collision-DEBUG", "⚠️ Sin ArenaCollider, usando fallback")
+
+            if (x < GameViewModel.REAL_MIN_X || x > GameViewModel.REAL_MAX_X ||
+                z < GameViewModel.REAL_MIN_Z || z > GameViewModel.REAL_MAX_Z) {
+                Gdx.app.error("Collision", "❌ FUERA DE BOUNDING BOX!")
+                Gdx.app.error("Collision", "   Posición: (${x}, ${z})")
                 return true
+            } else {
+                Gdx.app.log("Collision-DEBUG", "✅ Dentro de bounding box")
             }
         }
 
-        // Colisión con trails (excluyendo la posición actual)
+        // ✅ 3. Colisión con trails (excluyendo la posición actual)
         if (state.isPositionOccupied(position)) {
+            Gdx.app.error("Collision", "🚫 Colisión con trail en: (${x}, ${z})")
             return true
+        } else {
+            Gdx.app.log("Collision-DEBUG", "✅ Sin colisión con trails")
         }
 
+        Gdx.app.log("Collision-DEBUG", "✅✅✅ MOVIMIENTO VÁLIDO")
         return false
     }
 
@@ -274,17 +386,21 @@ class GameViewModel {
             player1Score = newPlayer1Score,
             player2Score = newPlayer2Score
         )
+
+        Gdx.app.log("GameViewModel", "🏆 RONDA TERMINADA - Ganador: $winner")
+        Gdx.app.log("GameViewModel", "📊 Puntuación: P1=$newPlayer1Score, P2=$newPlayer2Score")
     }
 
     /**
      * Reinicia el round (mantiene puntuación) y limpia los rastros
-     * ✅ USA POSICIONES DE LA ARENA SI ESTÁ DISPONIBLE
+     * ✅ USA POSICIONES REALES SIEMPRE
      */
     fun restartRound() {
         val state = _gameState.value
 
-        val p1Pos = arenaCollider?.getStartPosition(0.2f) ?: Vector2(10f, 15f)
-        val p2Pos = arenaCollider?.getStartPosition(0.8f) ?: Vector2(40f, 15f)
+        // ✅ Usar posiciones REALES SIEMPRE
+        val p1Pos = getRealStartPosition(PlayerTurn.PLAYER1)
+        val p2Pos = getRealStartPosition(PlayerTurn.PLAYER2)
 
         _gameState.value = GameState(
             player1Position = p1Pos,
@@ -302,7 +418,9 @@ class GameViewModel {
             gridWidth = state.gridWidth,
             gridHeight = state.gridHeight
         )
-        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda - Rastros limpios")
+        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda ${state.currentRound + 1}")
+        Gdx.app.log("GameViewModel", "🏍️ P1: $p1Pos, P2: $p2Pos")
+        Gdx.app.log("GameViewModel", "🧹 Rastros limpios y posiciones REALES")
     }
 
     /**
@@ -312,6 +430,7 @@ class GameViewModel {
         val state = _gameState.value
         if (state.status == GameStatus.PLAYING) {
             _gameState.value = state.copy(status = GameStatus.PAUSED)
+            Gdx.app.log("GameViewModel", "⏸️ Juego pausado")
         }
     }
 
@@ -322,6 +441,7 @@ class GameViewModel {
         val state = _gameState.value
         if (state.status == GameStatus.PAUSED) {
             _gameState.value = state.copy(status = GameStatus.PLAYING)
+            Gdx.app.log("GameViewModel", "▶️ Juego reanudado")
         }
     }
 
@@ -330,11 +450,20 @@ class GameViewModel {
      */
     fun updatePlayer1FromNetwork(position: Vector2, direction: Direction, trail: List<Vector2>) {
         val state = _gameState.value
+
+        // ✅ Verificar que la posición recibida sea válida según límites REALES
+        if (!isPositionRealValid(position.x, position.y)) {
+            Gdx.app.error("GameViewModel", "❌ Posición P1 recibida por red fuera de límites REALES: $position")
+            return
+        }
+
         _gameState.value = state.copy(
             player1Position = position,
             player1Direction = direction,
             player1Trail = trail
         )
+
+        Gdx.app.log("GameViewModel", "📥 P1 actualizado desde red: $position $direction")
     }
 
     /**
@@ -342,10 +471,38 @@ class GameViewModel {
      */
     fun updatePlayer2FromNetwork(position: Vector2, direction: Direction, trail: List<Vector2>) {
         val state = _gameState.value
+
+        // ✅ Verificar que la posición recibida sea válida según límites REALES
+        if (!isPositionRealValid(position.x, position.y)) {
+            Gdx.app.error("GameViewModel", "❌ Posición P2 recibida por red fuera de límites REALES: $position")
+            return
+        }
+
         _gameState.value = state.copy(
             player2Position = position,
             player2Direction = direction,
             player2Trail = trail
         )
+
+        Gdx.app.log("GameViewModel", "📥 P2 actualizado desde red: $position $direction")
+    }
+
+    /**
+     * ✅ NUEVO: Verificar si el collider está activo
+     */
+    fun isColliderActive(): Boolean {
+        return arenaCollider != null
+    }
+
+    /**
+     * ✅ NUEVO: Obtener información del collider para debug
+     */
+    fun getColliderInfo(): String {
+        return if (arenaCollider != null) {
+            val bounds = arenaCollider!!.getBounds()
+            "ArenaCollider activo - ${bounds["width"]}x${bounds["depth"]}"
+        } else {
+            "ArenaCollider NO configurado"
+        }
     }
 }
