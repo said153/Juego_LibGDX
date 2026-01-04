@@ -13,6 +13,7 @@ object BluetoothProtocol {
     const val MSG_PLAYER_MOVE = "MOVE"
     const val MSG_COLLISION = "COLLISION"
     const val MSG_GAME_OVER = "GAMEOVER"
+    const val MSG_GAME_RESTART = "RESTART"  // ✅ NUEVO: Mensaje para reiniciar
 
     /**
      * Crea un mensaje de movimiento del jugador
@@ -110,6 +111,14 @@ object BluetoothProtocol {
     }
 
     /**
+     * ✅ NUEVO: Crea mensaje de reinicio del juego
+     * Formato: RESTART|currentRound
+     */
+    fun createRestartMessage(currentRound: Int): String {
+        return "$MSG_GAME_RESTART|$currentRound"
+    }
+
+    /**
      * Parsea mensaje de game over con puntuación
      */
     fun parseGameOverMessage(message: String): GameOverData? {
@@ -130,6 +139,28 @@ object BluetoothProtocol {
             val currentRound = parts[4].toInt()
 
             GameOverData(winner, player1Score, player2Score, currentRound)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * ✅ NUEVO: Parsea mensaje de reinicio
+     */
+    fun parseRestartMessage(message: String): Int? {
+        return try {
+            val parts = message.split("|")
+
+            if (parts.isEmpty() || parts[0] != MSG_GAME_RESTART) {
+                return null
+            }
+
+            if (parts.size < 2) {
+                return null
+            }
+
+            parts[1].toInt()
         } catch (e: Exception) {
             e.printStackTrace()
             null

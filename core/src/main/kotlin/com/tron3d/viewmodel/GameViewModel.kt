@@ -397,6 +397,17 @@ class GameViewModel {
     }
 
     /**
+     * ✅ NUEVO: Enviar mensaje de reinicio por Bluetooth (solo el host)
+     */
+    private fun sendRestartOverBluetooth(currentRound: Int) {
+        if (_bluetoothManager == null || !_isHost) return
+
+        val message = BluetoothProtocol.createRestartMessage(currentRound)
+        _bluetoothManager?.sendMessage(message)
+        Gdx.app.log("GameViewModel", "🔄 Enviado reinicio por Bluetooth: ronda $currentRound")
+    }
+
+    /**
      * Termina el round actual con un ganador
      */
     private fun endRound(winner: PlayerTurn) {
@@ -438,7 +449,7 @@ class GameViewModel {
     /**
      * Actualizar puntuación desde mensaje de game over
      */
-    fun updateScoreFromNetwork(gameOverData: com.tron3d.network.GameOverData) {  // <- CAMBIADO
+    fun updateScoreFromNetwork(gameOverData: com.tron3d.network.GameOverData) {
         _gameState.value = _gameState.value.copy(
             player1Score = gameOverData.player1Score,
             player2Score = gameOverData.player2Score,
@@ -454,10 +465,9 @@ class GameViewModel {
     }
 
     /**
-     * Reinicia el round (mantiene puntuación) y limpia los rastros
-     * ✅ USA POSICIONES REALES SIEMPRE
+     * ✅ NUEVO: Sincronizar reinicio desde red
      */
-    fun restartRound() {
+    fun syncRestartFromNetwork(currentRound: Int) {
         val state = _gameState.value
 
         // ✅ Usar posiciones REALES SIEMPRE
@@ -475,14 +485,53 @@ class GameViewModel {
             currentTurn = PlayerTurn.PLAYER1,
             player1Score = state.player1Score,
             player2Score = state.player2Score,
-            currentRound = state.currentRound + 1,
+            currentRound = currentRound, // ✅ Usar el round recibido
             isMultiplayer = state.isMultiplayer,
             gridWidth = state.gridWidth,
             gridHeight = state.gridHeight
         )
-        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda ${state.currentRound + 1}")
+
+        Gdx.app.log("GameViewModel", "🔄 Sincronizando reinicio desde red: ronda $currentRound")
+    }
+
+    /**
+     * Reinicia el round (mantiene puntuación) y limpia los rastros
+     * ✅ USA POSICIONES REALES SIEMPRE
+     */
+    fun restartRound() {
+        val state = _gameState.value
+
+        // ✅ Usar posiciones REALES SIEMPRE
+        val p1Pos = getRealStartPosition(PlayerTurn.PLAYER1)
+        val p2Pos = getRealStartPosition(PlayerTurn.PLAYER2)
+
+        val newRound = state.currentRound + 1
+
+        _gameState.value = GameState(
+            player1Position = p1Pos,
+            player2Position = p2Pos,
+            player1Direction = Direction.RIGHT,
+            player2Direction = Direction.LEFT,
+            player1Trail = listOf(p1Pos), // ✅ Lista nueva con solo la posición inicial
+            player2Trail = listOf(p2Pos), // ✅ Lista nueva con solo la posición inicial
+            status = GameStatus.PLAYING,
+            currentTurn = PlayerTurn.PLAYER1,
+            player1Score = state.player1Score,
+            player2Score = state.player2Score,
+            currentRound = newRound,
+            isMultiplayer = state.isMultiplayer,
+            gridWidth = state.gridWidth,
+            gridHeight = state.gridHeight
+        )
+
+        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda $newRound")
         Gdx.app.log("GameViewModel", "🏍️ P1: $p1Pos, P2: $p2Pos")
         Gdx.app.log("GameViewModel", "🧹 Rastros limpios y posiciones REALES")
+
+        // ✅ ENVIAR REINICIO POR BLUETOOTH SI ES HOST
+        if (_bluetoothManager != null && _isHost) {
+            sendRestartOverBluetooth(newRound)
+        }
     }
 
     /**

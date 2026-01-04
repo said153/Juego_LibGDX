@@ -376,7 +376,7 @@ class GameScreen(
     }
 
     /**
-     * ✅ Manejar mensajes Bluetooth
+     * ✅ Manejar mensajes Bluetooth - ACTUALIZADO PARA REINICIO
      */
     private fun handleBluetoothMessage(message: String) {
         // Primero intentar parsear como movimiento
@@ -397,6 +397,18 @@ class GameScreen(
         if (gameOverData != null) {
             Gdx.app.log("GameScreen", "📥 Recibido game over: P1=${gameOverData.player1Score}, P2=${gameOverData.player2Score}")
             gameViewModel.updateScoreFromNetwork(gameOverData)
+            return
+        }
+
+        // ✅ NUEVO: Intentar parsear como mensaje de reinicio
+        val restartRound = BluetoothProtocol.parseRestartMessage(message)
+        if (restartRound != null) {
+            Gdx.app.log("GameScreen", "🔄 Recibido comando de reinicio: ronda $restartRound")
+            // ✅ PRIMERO: Limpiar todos los rastros visuales
+            clearAllTrailsImmediately()
+
+            // ✅ SEGUNDO: Sincronizar el reinicio desde el host
+            gameViewModel.syncRestartFromNetwork(restartRound)
             return
         }
 
@@ -849,6 +861,11 @@ class GameScreen(
         // ✅ SIEMPRE manejar gestos de cámara, incluso en modo debug
         handleCameraGestures()
 
+        // ✅ MANEJAR TECLA ESPACIO PARA REINICIAR (modo local y Bluetooth)
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+            handleRestartGame()
+        }
+
         // ✅ Actualizar punto de debug si está activo
         if (isDebugMode) {
             debugPointController.update(camera)
@@ -894,6 +911,68 @@ class GameScreen(
         renderMenuButton()
         renderDebugInfo(gameViewModel.gameState.value)
         renderCameraControls()
+
+        // ✅ RENDERIZAR MENSAJE PARA REINICIAR
+        renderRestartPrompt()
+    }
+
+    /**
+     * ✅ NUEVO: Renderizar mensaje para reiniciar
+     */
+    private fun renderRestartPrompt() {
+        val state = gameViewModel.gameState.value
+
+        if (state.status.isGameOver()) {
+            spriteBatch.begin()
+            font.color = tronCyan
+            font.data.setScale(2.5f)
+            font.draw(spriteBatch, "TOCA PARA CONTINUAR", Gdx.graphics.width / 2f - 350f, Gdx.graphics.height / 2f)
+
+            // ✅ NUEVO: Mostrar también opción de espacio
+            font.color = Color.YELLOW
+            font.data.setScale(1.5f)
+            font.draw(spriteBatch, "o PRESIONA ESPACIO", Gdx.graphics.width / 2f - 200f, Gdx.graphics.height / 2f - 50f)
+
+            // ✅ Mostrar información de sincronización Bluetooth
+            if (isBluetooth) {
+                font.color = if (isHost) Color.GREEN else Color.ORANGE
+                font.data.setScale(1.2f)
+                val syncText = if (isHost) "HOST: Reiniciarás ambos jugadores" else "CLIENTE: Esperando al host"
+                font.draw(spriteBatch, syncText, Gdx.graphics.width / 2f - 250f, Gdx.graphics.height / 2f - 100f)
+            }
+
+            spriteBatch.end()
+        }
+    }
+
+    /**
+     * ✅ NUEVO: Manejar reinicio del juego
+     */
+    private fun handleRestartGame() {
+        val state = gameViewModel.gameState.value
+
+        // Solo permitir reinicio si el juego terminó
+        if (state.status.isGameOver()) {
+            // ✅ PRIMERO: Limpiar todos los rastros visuales
+            clearAllTrailsImmediately()
+
+            // ✅ SEGUNDO: Reiniciar la ronda
+            gameViewModel.restartRound()
+
+            Gdx.app.log("GameScreen", "🔄 Reinicio activado por ESPACIO - Ronda ${state.currentRound + 1}")
+
+            // ✅ En modo Bluetooth, mostrar mensaje de sincronización
+            if (isBluetooth && isHost) {
+                Gdx.app.log("GameScreen", "🔄 Host enviando comando de reinicio al cliente")
+            }
+        } else if (state.status == GameStatus.PLAYING) {
+            // Si el juego está en progreso, pausar/reanudar con espacio
+            if (state.status == GameStatus.PLAYING) {
+                gameViewModel.pauseGame()
+            } else if (state.status == GameStatus.PAUSED) {
+                gameViewModel.resumeGame()
+            }
+        }
     }
 
     private var frameCount = 0
@@ -1026,11 +1105,6 @@ class GameScreen(
         font.color = Color.WHITE
         font.data.setScale(1.5f)
 
-        if (gameViewModel.gameState.value.status.isGameOver()) {
-            font.color = tronCyan
-            font.data.setScale(2.5f)
-            font.draw(spriteBatch, "TOCA PARA CONTINUAR", Gdx.graphics.width / 2f - 350f, Gdx.graphics.height / 2f)
-        }
         spriteBatch.end()
     }
 
