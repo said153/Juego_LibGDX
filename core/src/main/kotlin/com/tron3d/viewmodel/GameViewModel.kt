@@ -7,6 +7,8 @@ import com.tron3d.models.Direction
 import com.tron3d.models.GameState
 import com.tron3d.models.GameStatus
 import com.tron3d.models.PlayerTurn
+import com.tron3d.network.BluetoothInterface
+import com.tron3d.network.BluetoothProtocol
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,10 @@ class GameViewModel {
 
     // ✅ Sistema de colisión de la arena
     private var arenaCollider: ArenaCollider? = null
+
+    // ✅ Propiedades para Bluetooth
+    private var _bluetoothManager: BluetoothInterface? = null
+    private var _isHost: Boolean = false
 
     // ✅ LÍMITES REALES BASADOS EN COORDENADAS MEDIDAS
     companion object {
@@ -48,6 +54,16 @@ class GameViewModel {
                 PlayerTurn.PLAYER2 -> Vector2(55f, REAL_CENTER_Z)   // Dentro de límites reales
             }
         }
+    }
+
+    /**
+     * Configurar Bluetooth en el ViewModel
+     */
+    fun setupBluetooth(bluetoothManager: BluetoothInterface?, isHost: Boolean) {
+        _bluetoothManager = bluetoothManager
+        _isHost = isHost
+
+        Gdx.app.log("GameViewModel", "🔧 Bluetooth configurado - Host: $isHost")
     }
 
     /**
@@ -358,6 +374,29 @@ class GameViewModel {
     }
 
     /**
+     * Enviar mensaje de game over por Bluetooth (solo el host)
+     */
+    private fun sendGameOverOverBluetooth(winner: PlayerTurn) {
+        if (_bluetoothManager == null || !_isHost) return
+
+        val state = _gameState.value
+        val winnerCode = when (winner) {
+            PlayerTurn.PLAYER1 -> 1
+            PlayerTurn.PLAYER2 -> 2
+        }
+
+        val message = BluetoothProtocol.createGameOverMessageWithScore(
+            winner = winnerCode,
+            player1Score = state.player1Score,
+            player2Score = state.player2Score,
+            currentRound = state.currentRound
+        )
+
+        _bluetoothManager?.sendMessage(message)
+        Gdx.app.log("GameViewModel", "🏆 Enviado game over por Bluetooth: P1=${state.player1Score}, P2=${state.player2Score}")
+    }
+
+    /**
      * Termina el round actual con un ganador
      */
     private fun endRound(winner: PlayerTurn) {
@@ -389,6 +428,29 @@ class GameViewModel {
 
         Gdx.app.log("GameViewModel", "🏆 RONDA TERMINADA - Ganador: $winner")
         Gdx.app.log("GameViewModel", "📊 Puntuación: P1=$newPlayer1Score, P2=$newPlayer2Score")
+
+        // ✅ ENVIAR POR BLUETOOTH SI ES HOST
+        if (_bluetoothManager != null && _isHost) {
+            sendGameOverOverBluetooth(winner)
+        }
+    }
+
+    /**
+     * Actualizar puntuación desde mensaje de game over
+     */
+    fun updateScoreFromNetwork(gameOverData: com.tron3d.network.GameOverData) {  // <- CAMBIADO
+        _gameState.value = _gameState.value.copy(
+            player1Score = gameOverData.player1Score,
+            player2Score = gameOverData.player2Score,
+            currentRound = gameOverData.currentRound,
+            status = when (gameOverData.winner) {
+                1 -> GameStatus.PLAYER1_WON
+                2 -> GameStatus.PLAYER2_WON
+                else -> GameStatus.DRAW
+            }
+        )
+
+        Gdx.app.log("GameViewModel", "📥 Puntuación actualizada desde red: P1=${gameOverData.player1Score}, P2=${gameOverData.player2Score}")
     }
 
     /**

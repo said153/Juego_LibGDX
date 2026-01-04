@@ -97,11 +97,43 @@ object BluetoothProtocol {
     }
 
     /**
-     * Crea mensaje de game over
-     * Formato: GAMEOVER|winner
+     * Crea mensaje de game over CON PUNTUACIÓN
+     * Formato: GAMEOVER|winner|player1Score|player2Score|currentRound
      */
-    fun createGameOverMessage(winner: Int): String {
-        return "$MSG_GAME_OVER|$winner"
+    fun createGameOverMessageWithScore(
+        winner: Int,
+        player1Score: Int,
+        player2Score: Int,
+        currentRound: Int
+    ): String {
+        return "$MSG_GAME_OVER|$winner|$player1Score|$player2Score|$currentRound"
+    }
+
+    /**
+     * Parsea mensaje de game over con puntuación
+     */
+    fun parseGameOverMessage(message: String): GameOverData? {
+        return try {
+            val parts = message.split("|")
+
+            if (parts.isEmpty() || parts[0] != MSG_GAME_OVER) {
+                return null
+            }
+
+            if (parts.size < 5) {
+                return null
+            }
+
+            val winner = parts[1].toInt()
+            val player1Score = parts[2].toInt()
+            val player2Score = parts[3].toInt()
+            val currentRound = parts[4].toInt()
+
+            GameOverData(winner, player1Score, player2Score, currentRound)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 }
 
@@ -113,4 +145,14 @@ data class PlayerMoveData(
     val position: Vector2,
     val direction: Direction,
     val trail: List<Vector2>
+)
+
+/**
+ * Data class para datos de game over
+ */
+data class GameOverData(
+    val winner: Int,
+    val player1Score: Int,
+    val player2Score: Int,
+    val currentRound: Int
 )

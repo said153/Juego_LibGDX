@@ -171,6 +171,13 @@ class GameScreen(
 
         gameViewModel.startNewGame()
         observeGameState()
+
+        // ✅ CONFIGURAR BLUETOOTH EN EL VIEWMODEL
+        if (isBluetooth && bluetoothManager != null) {
+            gameViewModel.setupBluetooth(bluetoothManager, isHost)
+            Gdx.app.log("GameScreen", "🔧 ViewModel configurado con Bluetooth - Host: $isHost")
+        }
+
         setupBluetoothListener()
 
         val mode = if (isBluetooth) {
@@ -282,7 +289,6 @@ class GameScreen(
         Gdx.app.log("GameScreen", "📏 Ancho arena: ${gridWidth}, Profundidad: ${gridHeight}")
     }
 
-
     /**
      * ✅ Cargar arena
      */
@@ -373,14 +379,35 @@ class GameScreen(
      * ✅ Manejar mensajes Bluetooth
      */
     private fun handleBluetoothMessage(message: String) {
-        val moveData = BluetoothProtocol.parsePlayerMoveMessage(message) ?: return
+        // Primero intentar parsear como movimiento
+        val moveData = BluetoothProtocol.parsePlayerMoveMessage(message)
+        if (moveData != null) {
+            if (isHost && moveData.playerNumber == 2) {
+                gameViewModel.updatePlayer2FromNetwork(moveData.position, moveData.direction, moveData.trail)
+                Gdx.app.log("GameScreen", "📥 Host recibió: P2 en (${moveData.position.x.toInt()}, ${moveData.position.y.toInt()})")
+            } else if (!isHost && moveData.playerNumber == 1) {
+                gameViewModel.updatePlayer1FromNetwork(moveData.position, moveData.direction, moveData.trail)
+                Gdx.app.log("GameScreen", "📥 Cliente recibió: P1 en (${moveData.position.x.toInt()}, ${moveData.position.y.toInt()})")
+            }
+            return
+        }
 
-        if (isHost && moveData.playerNumber == 2) {
-            gameViewModel.updatePlayer2FromNetwork(moveData.position, moveData.direction, moveData.trail)
-            Gdx.app.log("GameScreen", "📥 Host recibió: P2 en (${moveData.position.x.toInt()}, ${moveData.position.y.toInt()})")
-        } else if (!isHost && moveData.playerNumber == 1) {
-            gameViewModel.updatePlayer1FromNetwork(moveData.position, moveData.direction, moveData.trail)
-            Gdx.app.log("GameScreen", "📥 Cliente recibió: P1 en (${moveData.position.x.toInt()}, ${moveData.position.y.toInt()})")
+        // ✅ Intentar parsear como mensaje de game over (con puntuación)
+        val gameOverData = BluetoothProtocol.parseGameOverMessage(message)
+        if (gameOverData != null) {
+            Gdx.app.log("GameScreen", "📥 Recibido game over: P1=${gameOverData.player1Score}, P2=${gameOverData.player2Score}")
+            gameViewModel.updateScoreFromNetwork(gameOverData)
+            return
+        }
+
+        // ✅ También procesar el mensaje de colisión simple
+        if (message.startsWith(BluetoothProtocol.MSG_COLLISION)) {
+            val parts = message.split("|")
+            if (parts.size >= 2) {
+                val playerNumber = parts[1].toInt()
+                Gdx.app.log("GameScreen", "📥 Recibido colisión para jugador $playerNumber")
+                // Aquí podrías manejar la colisión si es necesario
+            }
         }
     }
 
@@ -391,14 +418,35 @@ class GameScreen(
         if (!isBluetooth || bluetoothManager == null) return
 
         val state = gameViewModel.gameState.value
-        val message = if (isHost) {
-            BluetoothProtocol.createPlayerMoveMessage(1, state.player1Position, state.player1Direction, state.player1Trail)
-        } else {
-            BluetoothProtocol.createPlayerMoveMessage(2, state.player2Position, state.player2Direction, state.player2Trail)
-        }
 
-        bluetoothManager.sendMessage(message)
-        Gdx.app.log("GameScreen", "📤 Estado enviado: ${if (isHost) "P1" else "P2"}")
+        // ✅ Si el juego terminó, enviar mensaje de game over
+        if (state.status.isGameOver()) {
+            val winner = when (state.status) {
+                GameStatus.PLAYER1_WON -> 1
+                GameStatus.PLAYER2_WON -> 2
+                else -> 0
+            }
+
+            val message = BluetoothProtocol.createGameOverMessageWithScore(
+                winner = winner,
+                player1Score = state.player1Score,
+                player2Score = state.player2Score,
+                currentRound = state.currentRound
+            )
+
+            bluetoothManager.sendMessage(message)
+            Gdx.app.log("GameScreen", "🏆 Enviado game over: P1=${state.player1Score}, P2=${state.player2Score}")
+        } else {
+            // Enviar movimiento normal
+            val message = if (isHost) {
+                BluetoothProtocol.createPlayerMoveMessage(1, state.player1Position, state.player1Direction, state.player1Trail)
+            } else {
+                BluetoothProtocol.createPlayerMoveMessage(2, state.player2Position, state.player2Direction, state.player2Trail)
+            }
+
+            bluetoothManager.sendMessage(message)
+            Gdx.app.log("GameScreen", "📤 Estado enviado: ${if (isHost) "P1" else "P2"}")
+        }
     }
 
     /**
@@ -643,7 +691,6 @@ class GameScreen(
     /**
      * ✅ NUEVO: Renderizar límites REALES para debug
      */
-    // En render(), agregar después de renderCollisionBounds():
     private fun renderCollisionBounds() {
         if (!showCollisionBounds) return
 
@@ -752,6 +799,7 @@ class GameScreen(
 
         spriteBatch.end()
     }
+
     /**
      * ✅ NUEVO: Renderizar perímetro REAL de la arena para debug
      */
@@ -796,9 +844,6 @@ class GameScreen(
             spriteBatch.end()
         }
     }
-
-// En el método render(), agregar después de renderCollisionBounds():
-
 
     override fun render(delta: Float) {
         // ✅ SIEMPRE manejar gestos de cámara, incluso en modo debug
@@ -850,6 +895,7 @@ class GameScreen(
         renderDebugInfo(gameViewModel.gameState.value)
         renderCameraControls()
     }
+
     private var frameCount = 0
 
     /**
