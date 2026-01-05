@@ -2,11 +2,9 @@
 
 # 🏍️ TRON 3D: Arena de Motos 🏍️
 
-<img src="https://img.shields.io/badge/ESTADO-PRODUCCIÓN-00d9ff?style=for-the-badge&labelColor=000000" />
-<img src="https://img.shields.io/badge/KOTLIN-1.9.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
-<img src="https://img.shields.io/badge/LibGDX-1.12.1-E74430?style=for-the-badge" />
-<img src="https://img.shields.io/badge/ANDROID-24+-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
-<img src="https://img.shields.io/badge/LICENCIA-MIT-yellow?style=for-the-badge" />
+<img src="https://img.shields.io/badge/KOTLIN-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
+<img src="https://img.shields.io/badge/LibGDX-E74430?style=for-the-badge" />
+<img src="https://img.shields.io/badge/ANDROID-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
 
 ###  Juego de Carreras 3D con Gráficos 
 
@@ -436,6 +434,12 @@ dependencies {
 ---
 
 ### 🏍️ Importar tus Propios Modelos 3D desde Blender
+#### ****¿Por qué convertir los modelos a .g3db?****
+
+LibGDX no renderiza directamente formatos como .obj o .fbx, ya que estos están pensados para edición y no para ejecución en tiempo real.
+El formato .g3db convierte el modelo a un formato optimizado y compatible con LibGDX, permitiendo un renderizado más rápido, menor consumo de recursos y evitando errores de carga en el juego.
+
+📌 Siempre es necesario convertir el modelo antes de usarlo en el motor.
 
 #### **Paso 1: Exportar desde Blender**
 
