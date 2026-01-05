@@ -612,9 +612,6 @@ class GameViewModel {
         val p1Pos = getRealStartPosition(PlayerTurn.PLAYER1)
         val p2Pos = getRealStartPosition(PlayerTurn.PLAYER2)
 
-        // ✅ CREAR LISTAS VACÍAS PARA LOS TRAILS (no listas con una posición)
-        val emptyTrail: List<Vector2> = listOf()
-
         val newRound = state.currentRound + 1
 
         _gameState.value = GameState(
@@ -622,8 +619,8 @@ class GameViewModel {
             player2Position = p2Pos,
             player1Direction = Direction.RIGHT,
             player2Direction = Direction.LEFT,
-            player1Trail = emptyTrail, // ✅ LISTA VACÍA
-            player2Trail = emptyTrail, // ✅ LISTA VACÍA
+            player1Trail = listOf(p1Pos), // ✅ Lista nueva con solo la posición inicial
+            player2Trail = listOf(p2Pos), // ✅ Lista nueva con solo la posición inicial
             status = GameStatus.PLAYING,
             currentTurn = PlayerTurn.PLAYER1,
             player1Score = state.player1Score,
@@ -633,9 +630,6 @@ class GameViewModel {
             gridWidth = state.gridWidth,
             gridHeight = state.gridHeight
         )
-
-        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda ${state.currentRound + 1}")
-        Gdx.app.log("GameViewModel", "🧹 Rastros completamente limpios")
 
         Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda $newRound")
         Gdx.app.log("GameViewModel", "🏍️ P1: $p1Pos, P2: $p2Pos")

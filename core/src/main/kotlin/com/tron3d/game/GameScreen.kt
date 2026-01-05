@@ -173,9 +173,7 @@ class GameScreen(
     }
 
     override fun show() {
-        setupCamera()
-
-        // ✅ INICIALIZAR CONTROLADOR DE DEBUG
+        // 1. Debug controller
         debugPointController = DebugPointController()
         debugPointController.setFixedY(2f, false)
         debugPointController.setMoveSpeed(0.2f)
@@ -183,10 +181,10 @@ class GameScreen(
         // 2. Cargar arena
         loadArena()
 
-        // 3. Inicializar motos (ANTES de setupCamera)
+        // 3. ✅ INICIALIZAR MOTOS PRIMERO (antes de setupCamera)
         initializeCycles()
 
-        // 4. Configurar cámara
+        // 4. ✅ AHORA SÍ configurar cámara (después de que las motos existan)
         setupCamera()
 
         // 5. Limpiar rastros
@@ -202,9 +200,9 @@ class GameScreen(
 
             useGyroscope = true
 
-            // ✅ CONFIGURAR SENSIBILIDAD (sin InputProcessor innecesario)
-            gyroSensitivity = 3.0f  // Aumentar sensibilidad
-            gyroThreshold = 0.15f   // Reducir umbral
+            // ✅ CONFIGURAR SENSIBILIDAD
+            gyroSensitivity = 3.0f
+            gyroThreshold = 0.15f
 
             // ✅ VERIFICAR DISPONIBILIDAD DE SENSORES
             if (Gdx.input.isPeripheralAvailable(Input.Peripheral.Gyroscope)) {
@@ -217,7 +215,7 @@ class GameScreen(
             }
 
             Gdx.app.log("GameScreen", "🤖 IA inicializada - Dificultad: $aiDifficulty")
-            Gdx.app.log("GameScreen", "📹 Cámara primera persona activada")
+            Gdx.app.log("GameScreen", "📹 Cámara configurada para single player")
         }
 
         // 8. Bluetooth
