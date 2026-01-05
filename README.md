@@ -266,9 +266,7 @@
 | **Lenguaje** | <img src="https://img.shields.io/badge/Kotlin-7F52FF?style=flat&logo=kotlin&logoColor=white" /> | 1.9.0 | Lenguaje principal |
 | **Framework** | <img src="https://img.shields.io/badge/LibGDX-E74430?style=flat" /> | 1.12.1 | Motor de juegos 3D |
 | **Build** | <img src="https://img.shields.io/badge/Gradle-02303A?style=flat&logo=gradle&logoColor=white" /> | 8.0+ | Sistema de compilación |
-| **Gráficos** | <img src="https://img.shields.io/badge/OpenGL_ES-5586A4?style=flat&logo=opengl&logoColor=white" /> | 3.0+ | Renderizado 3D |
 | **3D** | <img src="https://img.shields.io/badge/Blender-F5792A?style=flat&logo=blender&logoColor=white" /> | 3.6+ | Modelado 3D |
-| **Shaders** | <img src="https://img.shields.io/badge/GLSL-5586A4?style=flat" /> | 3.30 | Efectos visuales |
 | **SO** | <img src="https://img.shields.io/badge/Android-3DDC84?style=flat&logo=android&logoColor=white" /> | 7.0+ | Plataforma móvil |
 
 </div>
