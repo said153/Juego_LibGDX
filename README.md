@@ -206,6 +206,36 @@
 ## 🎨 Galería Visual
 
 ###  Arena Digital 3D
+###  **MODO: Jugador vs IA**
+<div align="center">
+  <img width="1600" height="720" alt="1" src="https://github.com/user-attachments/assets/55153e3e-00cd-4e39-828a-f28eefd3758a" />
+  <br><br>
+  <img width="1600" height="720" alt="2" src="https://github.com/user-attachments/assets/8d87b7cc-f56f-4cdb-9a30-af94b9842510" />
+  <br><br>
+  <img width="1600" height="720" alt="3_ia" src="https://github.com/user-attachments/assets/eb533c9e-35f5-4cb0-ad47-6c98be981945" />
+</div>
+
+
+
+###  **MODO: Multijugador Local**
+<div align="center">
+  <img width="1600" height="720" alt="3_1_local" src="https://github.com/user-attachments/assets/4a31a6a0-6735-4f48-b450-3d544dc54d87" />
+  <br><br>
+  <img width="1600" height="720" alt="4_local" src="https://github.com/user-attachments/assets/49f81b1d-de8f-4ebe-89d0-c758c34295b1" />
+</div>
+
+
+
+###  **MODO: Bluetooth Multiplayer**
+<div align="center">
+  <img width="1600" height="720" alt="5_blue" src="https://github.com/user-attachments/assets/f3735644-a6b7-4583-8035-5b5c60b6066b" />
+  <br><br>
+  <img width="1600" height="720" alt="5_1_ble" src="https://github.com/user-attachments/assets/8f797d7f-071e-4a23-95a8-34e8aa7406d0" />
+  <br><br>
+  <img width="1600" height="720" alt="5_2_blue" src="https://github.com/user-attachments/assets/7245277b-05b7-456d-aa2f-36a12009b5ff" />
+  </div>
+
+
 
 ---
 
