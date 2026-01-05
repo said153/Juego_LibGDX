@@ -21,6 +21,7 @@ import com.badlogic.gdx.utils.UBJsonReader
 
 /**
  * MenuScreen con logo 3D - detección automática de formato
+ * ✅ BOTÓN 1 JUGADOR AHORA HABILITADO
  */
 class MenuScreen(private val game: Tron3DGame) : Screen {
 
@@ -61,14 +62,14 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
 
         buttons.clear()
 
-        // Botón 1 JUGADOR (deshabilitado)
+        // ✅ Botón 1 JUGADOR (AHORA HABILITADO)
         buttons.add(MenuButton(
             text = "1 JUGADOR",
             x = centerX,
             y = startY,
             width = buttonWidth,
             height = buttonHeight,
-            enabled = false
+            enabled = true  // ✅ CAMBIADO A TRUE
         ))
 
         // Botón MULTIJUGADOR (habilitado)
@@ -121,7 +122,7 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
     private fun setupLogo3D() {
         Gdx.app.log("MenuScreen", "Configurando cámara 3D...")
         camera3D = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-        camera3D?.position?.set(0f, 10f, 90f)  // Posición ajustada (arriba y más cerca)
+        camera3D?.position?.set(0f, 10f, 90f)
         camera3D?.lookAt(0f, 0f, 0f)
         camera3D?.near = 0.1f
         camera3D?.far = 300f
@@ -180,9 +181,9 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
             }
             Gdx.app.log("MenuScreen", "Materiales aplicados: $materialCount")
 
-            // Posicionar y escalar - ESTÁTICO Y MÁS GRANDE
-            logoInstance?.transform?.setToTranslation(0f, 32f, 0f)  // Subir el logo (Y = 3)
-            logoInstance?.transform?.scale(0.25f, 0.25f, 0.25f)  // Mucho más grande
+            // Posicionar y escalar
+            logoInstance?.transform?.setToTranslation(0f, 32f, 0f)
+            logoInstance?.transform?.scale(0.25f, 0.25f, 0.25f)
             Gdx.app.log("MenuScreen", "Transform aplicado")
 
             hasLogo3D = true
@@ -215,16 +216,12 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
 
     private fun renderLogo3D() {
         try {
-            // Logo ESTÁTICO - SIN viewport limitado, ocupa toda la parte superior
-
-            // Habilitar depth test
             Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
 
             modelBatch?.begin(camera3D)
             modelBatch?.render(logoInstance, environment)
             modelBatch?.end()
 
-            // Deshabilitar depth test
             Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
         } catch (e: Exception) {
             Gdx.app.error("MenuScreen", "Error renderizando: ${e.message}")
@@ -320,16 +317,7 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
 
             font.draw(spriteBatch, button.text, textX, textY)
 
-            // Mostrar "(Próximamente)" para botón deshabilitado
-            if (!button.enabled) {
-                font.data.setScale(1.2f)
-                font.color = Color.GRAY
-                val subText = "(Proximamente)"
-                val subLayout = com.badlogic.gdx.graphics.g2d.GlyphLayout(font, subText)
-                val subX = button.x - subLayout.width / 2f
-                val subY = button.y - 25f
-                font.draw(spriteBatch, subText, subX, subY)
-            }
+            // ✅ Ya no mostrar "(Próximamente)" en 1 JUGADOR
         }
         spriteBatch.end()
 
@@ -358,7 +346,8 @@ class MenuScreen(private val game: Tron3DGame) : Screen {
     private fun handleButtonClick(buttonText: String) {
         when (buttonText) {
             "1 JUGADOR" -> {
-                Gdx.app.log("MenuScreen", "1 Jugador (deshabilitado)")
+                Gdx.app.log("MenuScreen", "✅ 1 Jugador seleccionado")
+                game.showDifficultySelection()  // ✅ AHORA VA A SELECCIÓN DE DIFICULTAD
             }
             "MULTIJUGADOR" -> {
                 Gdx.app.log("MenuScreen", "Multijugador seleccionado")

@@ -34,11 +34,11 @@ class GameHUD(
         // Puntuación Jugador 1 (esquina superior izquierda)
         font.color = tronCyan
         font.data.setScale(2f)
-        font.draw(batch, "P1: ${state.player1Score}", 20f, screenHeight - 20f)
+        font.draw(batch, "P1: ${state.player1Score}", 20f, screenHeight - 60f)
 
         // Puntuación Jugador 2 (esquina superior derecha)
         font.color = tronOrange
-        font.draw(batch, "P2: ${state.player2Score}", screenWidth - 200f, screenHeight - 20f)
+        font.draw(batch, "P2: ${state.player2Score}", screenWidth - 200f, screenHeight - 60f)
 
         // Indicador de turno (si está jugando)
         if (state.status == GameStatus.PLAYING && state.isMultiplayer) {
@@ -74,7 +74,7 @@ class GameHUD(
         if (state.status == GameStatus.PLAYING) {
             font.color = Color.LIGHT_GRAY
             font.data.setScale(1f)
-            font.draw(batch, "ESC: Menú | R: Reiniciar", 20f, 60f)
+            font.draw(batch, "", 20f, 60f)
         } else if (state.status.isGameOver()) {
             font.color = Color.WHITE
             font.data.setScale(1.5f)

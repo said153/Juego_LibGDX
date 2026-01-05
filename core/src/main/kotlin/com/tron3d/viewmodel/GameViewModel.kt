@@ -34,8 +34,6 @@ class GameViewModel {
 
     // ✅ LÍMITES REALES BASADOS EN COORDENADAS MEDIDAS
     companion object {
-        // X min: -19.55, X max: 69.93
-        // Z min: -14.03, Z max: 24.76
         const val REAL_MIN_X = -20f      // Redondeado hacia abajo desde -19.55
         const val REAL_MAX_X = 70f       // Redondeado hacia arriba desde 69.93
         const val REAL_MIN_Z = -15f      // Redondeado hacia abajo desde -14.03
@@ -214,6 +212,115 @@ class GameViewModel {
                 currentTurn = currentTurn.next()
             )
         }
+    }
+
+    /**
+     * ✅ NUEVO: Hacer movimiento sin sistema de turnos (para modo single player)
+     * Ambos jugadores se pueden mover simultáneamente
+     */
+    fun makeMoveNoTurn(direction: Direction, player: PlayerTurn) {
+        val currentState = _gameState.value
+
+        if (currentState.status != GameStatus.PLAYING) {
+            return
+        }
+
+        // Determinar qué jugador se está moviendo
+        val (currentPos, currentDir, otherTrail) = when (player) {
+            PlayerTurn.PLAYER1 -> Triple(
+                currentState.player1Position,
+                currentState.player1Direction,
+                currentState.player2Trail
+            )
+            PlayerTurn.PLAYER2 -> Triple(
+                currentState.player2Position,
+                currentState.player2Direction,
+                currentState.player1Trail
+            )
+        }
+
+        // Calcular nueva dirección
+        val newDirection = calculateNewDirection(currentDir, direction)
+
+        // Calcular nueva posición
+        val newPosition = calculateNewPosition(currentPos, newDirection)
+
+        // Validar movimiento
+        if (!isValidMove(newPosition, player)) {
+            Gdx.app.log("GameViewModel", "❌ Movimiento inválido para $player")
+            handleCollision(player)
+            return
+        }
+
+        // Actualizar estado según el jugador
+        when (player) {
+            PlayerTurn.PLAYER1 -> {
+                val newTrail = currentState.player1Trail.toMutableList()
+                newTrail.add(Vector2(newPosition))
+
+                _gameState.value = currentState.copy(
+                    player1Position = newPosition,
+                    player1Direction = newDirection,
+                    player1Trail = newTrail
+                )
+
+                Gdx.app.log("Movement", "✅ P1 movido a: $newPosition")
+            }
+            PlayerTurn.PLAYER2 -> {
+                val newTrail = currentState.player2Trail.toMutableList()
+                newTrail.add(Vector2(newPosition))
+
+                _gameState.value = currentState.copy(
+                    player2Position = newPosition,
+                    player2Direction = newDirection,
+                    player2Trail = newTrail
+                )
+
+                Gdx.app.log("Movement", "✅ P2 movido a: $newPosition")
+            }
+        }
+    }
+
+    /**
+     * Manejar colisión de un jugador específico
+     */
+    private fun handleCollision(player: PlayerTurn) {
+        val currentState = _gameState.value
+
+        val newStatus = when (player) {
+            PlayerTurn.PLAYER1 -> {
+                Gdx.app.log("Collision", "🚫🚫 P1 PERDIÓ por colisión")
+
+                // Actualizar puntuación
+                val newP2Score = currentState.player2Score + 1
+                val newRound = currentState.currentRound + 1
+
+                _gameState.value = currentState.copy(
+                    status = GameStatus.PLAYER2_WON,
+                    player2Score = newP2Score,
+                    currentRound = newRound
+                )
+
+                GameStatus.PLAYER2_WON
+            }
+            PlayerTurn.PLAYER2 -> {
+                Gdx.app.log("Collision", "🚫🚫 P2 PERDIÓ por colisión")
+
+                // Actualizar puntuación
+                val newP1Score = currentState.player1Score + 1
+                val newRound = currentState.currentRound + 1
+
+                _gameState.value = currentState.copy(
+                    status = GameStatus.PLAYER1_WON,
+                    player1Score = newP1Score,
+                    currentRound = newRound
+                )
+
+                GameStatus.PLAYER1_WON
+            }
+        }
+
+        Gdx.app.log("GameViewModel", "🏆 RONDA TERMINADA - Ganador: ${if (newStatus == GameStatus.PLAYER1_WON) "PLAYER1" else "PLAYER2"}")
     }
 
     /**
@@ -505,6 +612,9 @@ class GameViewModel {
         val p1Pos = getRealStartPosition(PlayerTurn.PLAYER1)
         val p2Pos = getRealStartPosition(PlayerTurn.PLAYER2)
 
+        // ✅ CREAR LISTAS VACÍAS PARA LOS TRAILS (no listas con una posición)
+        val emptyTrail: List<Vector2> = listOf()
+
         val newRound = state.currentRound + 1
 
         _gameState.value = GameState(
@@ -512,8 +622,8 @@ class GameViewModel {
             player2Position = p2Pos,
             player1Direction = Direction.RIGHT,
             player2Direction = Direction.LEFT,
-            player1Trail = listOf(p1Pos), // ✅ Lista nueva con solo la posición inicial
-            player2Trail = listOf(p2Pos), // ✅ Lista nueva con solo la posición inicial
+            player1Trail = emptyTrail, // ✅ LISTA VACÍA
+            player2Trail = emptyTrail, // ✅ LISTA VACÍA
             status = GameStatus.PLAYING,
             currentTurn = PlayerTurn.PLAYER1,
             player1Score = state.player1Score,
@@ -523,6 +633,9 @@ class GameViewModel {
             gridWidth = state.gridWidth,
             gridHeight = state.gridHeight
         )
+
+        Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda ${state.currentRound + 1}")
+        Gdx.app.log("GameViewModel", "🧹 Rastros completamente limpios")
 
         Gdx.app.log("GameViewModel", "🔄 Reiniciando ronda $newRound")
         Gdx.app.log("GameViewModel", "🏍️ P1: $p1Pos, P2: $p2Pos")
@@ -615,5 +728,116 @@ class GameViewModel {
         } else {
             "ArenaCollider NO configurado"
         }
+    }
+
+    /**
+     * ✅ Calcular nueva dirección basándose en la dirección actual y el input
+     */
+    private fun calculateNewDirection(currentDirection: Direction, inputDirection: Direction): Direction {
+        // No permitir giro de 180 grados (marcha atrás)
+        if (inputDirection.isOpposite(currentDirection)) {
+            return currentDirection
+        }
+        return inputDirection
+    }
+
+    /**
+     * ✅ Calcular nueva posición basándose en posición actual y dirección
+     */
+    private fun calculateNewPosition(currentPosition: Vector2, direction: Direction): Vector2 {
+        val movement = direction.toVector()
+        return Vector2(
+            currentPosition.x + movement.first * moveSpeed,
+            currentPosition.y + movement.second * moveSpeed
+        )
+    }
+
+    /**
+     * ✅ Validar si un movimiento es válido (sin colisiones)
+     */
+    private fun isValidMove(newPosition: Vector2, player: PlayerTurn): Boolean {
+        val state = _gameState.value
+
+        // 1. Verificar límites de la arena
+        val x = newPosition.x
+        val z = newPosition.y
+
+        // Usar ArenaCollider si está disponible
+        if (arenaCollider != null) {
+            Gdx.app.log("Collision-DEBUG", "🔍 Verificando: (${"%.2f".format(x)}, ${"%.2f".format(z)})")
+
+            val isOutOfBounds = arenaCollider!!.isOutOfBounds(newPosition)
+
+            if (isOutOfBounds) {
+                Gdx.app.error("Collision", "🚫 COLISIÓN CON ARENA en: (${"%.2f".format(x)}, ${"%.2f".format(z)})")
+                return false
+            } else {
+                Gdx.app.log("Collision-DEBUG", "✅ Dentro de los límites de la arena")
+            }
+        } else {
+            // Fallback: verificación de bounding box
+            if (!isPositionRealValid(x, z)) {
+                Gdx.app.error("Collision", "❌ FUERA DE LÍMITES REALES!")
+                return false
+            }
+        }
+
+        // 2. Verificar colisión con trails
+        // Para Player 1: verificar contra trail de Player 2 y su propio trail (excepto última posición)
+        // Para Player 2: verificar contra trail de Player 1 y su propio trail (excepto última posición)
+
+        val player1Trail = state.player1Trail
+        val player2Trail = state.player2Trail
+
+        when (player) {
+            PlayerTurn.PLAYER1 -> {
+                // Verificar colisión con trail de Player 2
+                for (point in player2Trail) {
+                    if (point.dst(newPosition) < 0.5f) {
+                        Gdx.app.error("Collision", "🚫 P1 colisiona con trail de P2")
+                        return false
+                    }
+                }
+
+                // Verificar colisión con propio trail (excepto la posición actual)
+                for (i in 0 until player1Trail.size - 1) {
+                    val point = player1Trail[i]
+                    if (point.dst(newPosition) < 0.5f) {
+                        Gdx.app.error("Collision", "🚫 P1 colisiona con su propio trail")
+                        return false
+                    }
+                }
+            }
+            PlayerTurn.PLAYER2 -> {
+                // Verificar colisión con trail de Player 1
+                for (point in player1Trail) {
+                    if (point.dst(newPosition) < 0.5f) {
+                        Gdx.app.error("Collision", "🚫 P2 colisiona con trail de P1")
+                        return false
+                    }
+                }
+
+                // Verificar colisión con propio trail (excepto la posición actual)
+                for (i in 0 until player2Trail.size - 1) {
+                    val point = player2Trail[i]
+                    if (point.dst(newPosition) < 0.5f) {
+                        Gdx.app.error("Collision", "🚫 P2 colisiona con su propio trail")
+                        return false
+                    }
+                }
+            }
+        }
+
+        Gdx.app.log("Collision-DEBUG", "✅ Sin colisión con trails")
+        Gdx.app.log("Collision-DEBUG", "✅✅✅ MOVIMIENTO VÁLIDO")
+        return true
+    }
+
+    /**
+     * ✅ Limpiar recursos (si los hubiera)
+     */
+    fun dispose() {
+        // Actualmente no hay recursos que limpiar
+        // Pero es buena práctica tener este método
     }
 }

@@ -3,13 +3,15 @@ package com.tron3d.game
 
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
+import com.tron3d.ai.AIDifficulty
 import com.tron3d.network.BluetoothInterface
 import com.tron3d.ui.BluetoothSelectionScreen
 import com.tron3d.viewmodel.GameViewModel
 import com.tron3d.viewmodel.GameViewModel_Bluetooth
 
 /**
- * Clase principal del juego TRON 3D con soporte Bluetooth
+ * Clase principal del juego TRON 3D con soporte Bluetooth Y modo 1 jugador
+ * ✅ SOPORTE COMPLETO PARA IA
  */
 class Tron3DGame(private val bluetoothManager: BluetoothInterface? = null) : Game() {
 
@@ -36,7 +38,15 @@ class Tron3DGame(private val bluetoothManager: BluetoothInterface? = null) : Gam
     }
 
     /**
-     * Muestra la pantalla de selección de modo
+     * ✅ NUEVO: Muestra la pantalla de selección de dificultad para 1 jugador
+     */
+    fun showDifficultySelection() {
+        Gdx.app.log("Tron3DGame", "Mostrando selección de dificultad")
+        setScreen(AIDifficultyScreen(this))
+    }
+
+    /**
+     * Muestra la pantalla de selección de modo (multijugador)
      */
     fun showModeSelection() {
         Gdx.app.log("Tron3DGame", "Mostrando selección de modo")
@@ -60,12 +70,16 @@ class Tron3DGame(private val bluetoothManager: BluetoothInterface? = null) : Gam
     }
 
     /**
-     * Inicia partida un jugador (vs IA)
+     * ✅ NUEVO: Inicia partida un jugador (vs IA) con dificultad seleccionada
      */
-    fun startSinglePlayer() {
-        Gdx.app.log("Tron3DGame", "Un jugador aún no disponible")
-        // TODO: Implementar modo un jugador
-        startLocalMultiplayer()
+    fun startSinglePlayer(difficulty: AIDifficulty) {
+        Gdx.app.log("Tron3DGame", "")
+        setScreen(GameScreen(
+            game = this,
+            gameViewModel = gameViewModel,
+            isSinglePlayer = true,  // ✅ NUEVO PARÁMETRO
+            aiDifficulty = difficulty  // ✅ NUEVO PARÁMETRO
+        ))
     }
 
     /**

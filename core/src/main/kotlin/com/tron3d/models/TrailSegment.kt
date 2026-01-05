@@ -1,5 +1,6 @@
 package com.tron3d.models
 
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.VertexAttributes
@@ -7,82 +8,118 @@ import com.badlogic.gdx.graphics.g3d.Material
 import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
+import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute
+import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.math.Vector3
 
 /**
- * Segmento de rastro luminoso estilo Tron Legacy
+ * TrailSegment MEJORADO - Renderiza como LÍNEA en vez de rectángulo
+ * Se ve bien desde cualquier ángulo
  */
 class TrailSegment(
     val start: Vector3,
     val end: Vector3,
     val color: Color,
-    val width: Float = 0.3f,
-    val height: Float = 2.5f
+    val width: Float = 0.25f,      // Grosor de la línea
+    val height: Float = 0.25f      // Altura del rastro (casi plano)
 ) {
     val modelInstance: ModelInstance
-    private val model: Model
 
     init {
-        model = createTrailModel()
+        val model = createLineModel()
         modelInstance = ModelInstance(model)
-        updatePosition()
     }
 
-    private fun createTrailModel(): Model {
+    /**
+     * Crear modelo de línea 3D (pared vertical)
+     */
+    private fun createLineModel(): Model {
         val builder = ModelBuilder()
+        builder.begin()
 
-        // Material con glow intenso
+        // Material con emisión para que brille
         val material = Material().apply {
             set(ColorAttribute.createDiffuse(color))
             set(ColorAttribute.createEmissive(
-                color.r * 0.8f,  // Emisión muy fuerte para el rastro
+                color.r * 0.8f,
                 color.g * 0.8f,
                 color.b * 0.8f,
                 1f
             ))
+            set(BlendingAttribute(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA))
         }
 
-        builder.begin()
+        val node = builder.node()
+        node.id = "trail_line"
 
-        // Crear un muro vertical entre start y end
-        val part = builder.part(
+        // Crear pared vertical (trail de luz)
+        val partBuilder: MeshPartBuilder = builder.part(
             "trail",
             GL20.GL_TRIANGLES,
             (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong(),
             material
         )
 
-        // Caja delgada que va de start a end
-        part.box(width, height, 0.1f)
+        // Crear pared vertical entre dos puntos
+        createVerticalWall(partBuilder, start, end, width, height)
 
         return builder.end()
     }
 
-    private fun updatePosition() {
-        // Calcular el centro entre start y end
-        val center = Vector3(start).add(end).scl(0.5f)
+    /**
+     * Crear pared vertical entre dos puntos
+     */
+    private fun createVerticalWall(
+        builder: MeshPartBuilder,
+        start: Vector3,
+        end: Vector3,
+        thickness: Float,
+        wallHeight: Float
+    ) {
+        // Calcular vector dirección
+        val direction = Vector3(end).sub(start).nor()
 
-        // Calcular la dirección y longitud
-        val direction = Vector3(end).sub(start)
-        val length = direction.len()
+        // Vector perpendicular para el grosor
+        val perpendicular = Vector3(-direction.z, 0f, direction.x).nor()
+        val halfThickness = Vector3(perpendicular).scl(thickness / 2f)
 
-        // Aplicar transformación
-        modelInstance.transform.idt()
-        modelInstance.transform.setToTranslation(center)
+        // ✅ LOS VÉRTICES INFERIORES ESTÁN EN Y=0 (SUELO)
+        val v1 = Vector3(start).add(halfThickness)
+        val v2 = Vector3(start).sub(halfThickness)
+        val v3 = Vector3(end).sub(halfThickness)
+        val v4 = Vector3(end).add(halfThickness)
 
-        // Rotar hacia la dirección correcta
-        if (length > 0.01f) {
-            direction.nor()
-            val angle = Math.toDegrees(Math.atan2(direction.z.toDouble(), direction.x.toDouble())).toFloat()
-            modelInstance.transform.rotate(Vector3.Y, angle)
-        }
+        // ✅ LOS VÉRTICES SUPERIORES ESTÁN A wallHeight DE ALTURA
+        val v5 = Vector3(v1).add(0f, wallHeight, 0f)
+        val v6 = Vector3(v2).add(0f, wallHeight, 0f)
+        val v7 = Vector3(v3).add(0f, wallHeight, 0f)
+        val v8 = Vector3(v4).add(0f, wallHeight, 0f)
 
-        // Escalar para que tenga la longitud correcta
-        modelInstance.transform.scale(1f, 1f, length / 0.1f)
+        // Normales para cada cara
+        val normalFront = Vector3(0f, 0f, 1f)
+        val normalBack = Vector3(0f, 0f, -1f)
+        val normalLeft = Vector3(-perpendicular.x, 0f, -perpendicular.z).nor()
+        val normalRight = Vector3(perpendicular.x, 0f, perpendicular.z).nor()
+        val normalTop = Vector3(0f, 1f, 0f)
+
+        // Cara frontal
+        builder.rect(v1, v2, v6, v5, normalFront)
+
+        // Cara trasera
+        builder.rect(v4, v8, v7, v3, normalBack)
+
+        // Cara izquierda
+        builder.rect(v4, v1, v5, v8, normalLeft)
+
+        // Cara derecha
+        builder.rect(v2, v3, v7, v6, normalRight)
+
+        // Tapa superior
+        builder.rect(v5, v6, v7, v8, normalTop)
     }
 
     fun dispose() {
-        model.dispose()
+        modelInstance.model.dispose()
     }
 }

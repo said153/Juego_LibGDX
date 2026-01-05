@@ -10,7 +10,8 @@ import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.math.Vector3
 
 class LightCycle(
-    val colorNeon: Color,
+    val colorNeon: Color,      // Color de la moto
+    val trailColor: Color,
     initialPosition: Vector3,
     val playerId: Int = 1,
     modelPath: String? = null
@@ -19,6 +20,7 @@ class LightCycle(
     val direction = Vector3(1f, 0f, 0f)
     var speed = 5f
     var rotation = 0f
+    private var trailHeight = 0.01f
 
     private val modelInstance: ModelInstance
 
@@ -254,20 +256,23 @@ class LightCycle(
 
         val distance = currentPos.dst(lastTrailPosition!!)
 
-        if (distance >= minTrailDistance) {
-            // Crear nuevo segmento de rastro
+        if (distance >= 0.05f) {
+            // ✅ FORZAR Y = 0 para que el rastro esté en el suelo
             val segment = TrailSegment(
-                start = Vector3(lastTrailPosition!!),
-                end = Vector3(currentPos),
-                color = colorNeon,
-                width = 0.3f,
-                height = 2.5f
+                start = Vector3(lastTrailPosition!!.x, 0f, lastTrailPosition!!.z),  // ✅ Y = 0
+                end = Vector3(currentPos.x, 0f, currentPos.z),                       // ✅ Y = 0
+                color = trailColor,
+                width = 0.12f,
+                height = 1.0f
             )
 
             trailSegments.add(segment)
             lastTrailPosition!!.set(currentPos)
 
-            Gdx.app.log("LightCycle", "✨ Rastro creado: ${trailSegments.size} segmentos")
+            if (trailSegments.size > 800) {
+                val oldSegment = trailSegments.removeAt(0)
+                oldSegment.dispose()
+            }
         }
     }
 
