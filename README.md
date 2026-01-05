@@ -5,11 +5,10 @@
 <img src="https://img.shields.io/badge/KOTLIN-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
 <img src="https://img.shields.io/badge/LibGDX-E74430?style=for-the-badge" />
 <img src="https://img.shields.io/badge/ANDROID-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
-<img src="https://img.shields.io/badge/OpenGL_ES-5586A4?style=for-the-badge&logo=opengl&logoColor=white" />
 
 ![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Desktop-lightgrey?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
+
 
 ###  Juego de Carreras 3D con Gráficos Estilo TRON Legacy
 
