@@ -32,8 +32,7 @@
 - ✅ Crear un sistema de renderizado con efectos visuales avanzados
 - ✅ Desarrollar sincronización multijugador en tiempo real vía Bluetooth
 
-### 📊 Estado Actual
-🟢 **Versión Beta Funcional** - Todas las características principales implementadas y probadas
+
 
 ---
 
@@ -417,8 +416,6 @@ Se abrirá una ventana. Llena los campos así:
 **Sub Projects** (selecciona estos):
 - ✅ **Desktop** - Para probar en PC
 - ✅ **Android** - Para dispositivos móviles
-- ❌ iOS - No lo necesitamos
-- ❌ HTML - No lo necesitamos
 
 **Extensions:**
 - Puedes dejar todo sin marcar por ahora
@@ -541,27 +538,7 @@ config/
 
 ### **🚀 PASO 10: Compilar y Ejecutar**
 
-#### **Opción 1: Ejecutar en Desktop (Más rápido para probar)**
-
-```bash
-# En Windows
-gradlew.bat desktop:run
-
-# En Mac/Linux
-./gradlew desktop:run
-```
-
-**Deberías ver:**
-```
-> Task :desktop:run
-[LibGDX Application] Created window
-[LibGDX Application] OpenGL version: 4.6
-🎮 TRON 3D iniciado correctamente
-```
-
----
-
-#### **Opción 2: Ejecutar en Android**
+#### **Ejecutar en Android**
 
 **Con dispositivo físico:**
 
@@ -577,22 +554,6 @@ gradlew.bat desktop:run
 ./gradlew android:installDebug
 
 # La app aparecerá en tu teléfono como "TRON 3D"
-```
-
----
-
-### **⏱️ Tiempo Total Estimado**
-
-```
-┌────────────────────────────────────────┐
-│ Descargar generador:       1 min       │
-│ Generar proyecto:          2 min       │
-│ Gradle sync primera vez:   5-10 min    │
-│ Configurar SDK:            3 min       │
-│ Agregar archivos:          5 min       │
-├────────────────────────────────────────┤
-│ TOTAL:                     15-20 min   │
-└────────────────────────────────────────┘
 ```
 
 ---
