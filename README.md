@@ -6,10 +6,8 @@
 <img src="https://img.shields.io/badge/LibGDX-E74430?style=for-the-badge" />
 <img src="https://img.shields.io/badge/ANDROID-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
 
-![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Desktop-lightgrey?style=flat-square)
 
 
-###  Juego de Carreras 3D con Gráficos Estilo TRON Legacy
 
 ```
 ████████╗██████╗  ██████╗ ███╗   ██╗    ██████╗ ██████╗ 
@@ -336,87 +334,301 @@ dependencies {
 
 ---
 
-### 🛠️ Setup del Proyecto
+## 🛠️ Crear Proyecto desde Cero con LibGDX
 
-#### **Requisitos Previos**
+### 🎯 **¿Qué es LibGDX?**
 
-```bash
-# Verificar instalaciones necesarias
-java -version    # JDK 11 o superior
-git --version    # Git
-```
-
-- ✅ **Android Studio** Arctic Fox o superior
-- ✅ **JDK 11+** (incluido con Android Studio)
-- ✅ **Gradle 8.0+** (se instala automáticamente)
+**LibGDX** es el motor de juegos 3D multiplataforma que utilizamos. Es necesario instalarlo para que el proyecto funcione correctamente.
 
 ---
 
-#### **Paso 1: Clonar el Repositorio**
+### **📋 PASO 1: Requisitos Previos**
+
+Antes de empezar, verifica que tienes instalado:
 
 ```bash
-# Clonar el proyecto
+# Verificar Java (debe ser JDK 11 o superior)
+java -version
+
+# Verificar Git
+git --version
+```
+
+**Necesitas instalar:**
+
+- ✅ **JDK 11+** - [Descargar aquí](https://www.oracle.com/java/technologies/downloads/)
+- ✅ **Android Studio** - [Descargar aquí](https://developer.android.com/studio)
+- ✅ **Git** - [Descargar aquí](https://git-scm.com/downloads)
+
+---
+
+### **⚙️ PASO 2: Descargar el Generador de LibGDX**
+
+LibGDX tiene un generador que crea la estructura del proyecto automáticamente.
+
+**Opción A - Usando gdx-liftoff (Recomendado):**
+
+1. Ve a: https://libgdx.com/dev/project-generation/
+2. Descarga: **gdx-liftoff.jar**
+3. Guárdalo en una carpeta (ej: Escritorio o Documentos)
+
+**Opción B - Usando gdx-setup (Alternativa):**
+
+1. Ve a: https://libgdx.com/dev/setup/
+2. Descarga: **gdx-setup.jar**
+3. Guárdalo en la misma carpeta
+
+---
+
+### **🚀 PASO 3: Ejecutar el Generador**
+
+**Método 1 - Doble Click (Más fácil):**
+
+- Haz **doble click** en el archivo `.jar` descargado
+
+**Método 2 - Desde Terminal:**
+
+```bash
+# En Windows
+cd C:\Users\TuNombre\Documentos
+java -jar gdx-liftoff.jar
+
+# En Mac/Linux
+cd ~/Documents
+java -jar gdx-liftoff.jar
+```
+
+---
+
+### **📝 PASO 4: Configurar el Proyecto**
+
+Se abrirá una ventana. Llena los campos así:
+
+```
+┌─────────────────────────────────────────────────┐
+│ Name:           Juego_Tron                      │
+│ Package:        com.juegotron.game              │
+│ Game class:     TronGame                        │
+│ Destination:    C:\Users\TuNombre\Projects\     │
+│ Android SDK:    (se detecta automáticamente)    │
+└─────────────────────────────────────────────────┘
+```
+
+**Sub Projects** (selecciona estos):
+- ✅ **Desktop** - Para probar en PC
+- ✅ **Android** - Para dispositivos móviles
+- ❌ iOS - No lo necesitamos
+- ❌ HTML - No lo necesitamos
+
+**Extensions:**
+- Puedes dejar todo sin marcar por ahora
+
+---
+
+### **⚡ PASO 5: Generar el Proyecto**
+
+1. Click en **"Generate"** o **"Create Project"**
+2. Espera 1-2 minutos mientras se crea la estructura
+3. Se creará la carpeta `Juego_Tron` en la ubicación que especificaste
+
+**Estructura generada:**
+
+```
+Juego_Tron/
+├── android/          ← Proyecto Android
+├── core/             ← Código principal del juego
+├── desktop/          ← Versión de escritorio
+├── assets/           ← Recursos (imágenes, modelos, etc)
+├── build.gradle
+├── settings.gradle
+└── gradle/
+```
+
+---
+
+### **🔧 PASO 6: Abrir en Android Studio**
+
+1. Abre **Android Studio**
+2. **File** → **Open**
+3. Navega y selecciona la carpeta **`Juego_Tron`**
+4. Click en **"OK"**
+5. Espera el **Gradle Sync** (3-10 minutos la primera vez)
+   - Verás: `Syncing...` en la barra inferior
+   - Debe finalizar con: `BUILD SUCCESSFUL`
+
+---
+
+### **📁 PASO 7: Estructura del Proyecto en Android Studio**
+
+Una vez abierto, verás esta estructura:
+
+```
+Juego_Tron/
+│
+├── android/
+│   ├── src/
+│   │   └── com/juegotron/game/
+│   │       └── AndroidLauncher.kt
+│   └── assets/                        ← Aquí van recursos
+│       ├── models/                    ← Modelos 3D
+│       └── shaders/                   ← Shaders GLSL
+│
+├── core/
+│   └── src/
+│       └── com/juegotron/game/
+│           ├── TronGame.kt           ← Punto de entrada
+│           ├── models/               ← Modelos de datos
+│           ├── rendering/            ← Sistema de renderizado
+│           ├── ui/                   ← Interfaz de usuario
+│           └── viewmodel/            ← ViewModels (MVVM)
+│
+└── desktop/
+    └── src/
+        └── com/juegotron/game/
+            └── DesktopLauncher.kt
+```
+
+---
+
+### **🎮 PASO 8: Configurar SDK de Android**
+
+Para compilar en Android, necesitas configurar el SDK:
+
+1. **Tools** → **SDK Manager**
+
+2. En **SDK Platforms**, marca:
+   - ✅ Android 7.0 (Nougat) - API 24 (mínimo)
+   - ✅ Android 13.0 (Tiramisu) - API 33 (recomendado)
+
+3. En **SDK Tools**, marca:
+   - ✅ Android SDK Build-Tools
+   - ✅ Android SDK Platform-Tools
+   - ✅ Android Emulator (si no tienes dispositivo físico)
+
+4. Click **"Apply"** → **"OK"**
+
+---
+
+### **📥 PASO 9: Clonar o Agregar los Archivos del Juego**
+
+**Opción A - Si tienes el repositorio:**
+
+```bash
+# Clonar el proyecto completo
 git clone https://github.com/tu-usuario/tron3d.git
 cd tron3d
 ```
 
----
+**Opción B - Si creaste el proyecto vacío:**
 
-#### **Paso 2: Abrir en Android Studio**
+Ahora debes agregar los archivos del juego en la estructura que generaste:
 
-```
-1. Android Studio → File → Open
-2. Seleccionar carpeta 'tron3d'
-3. Esperar sincronización de Gradle (5-10 min primera vez)
-4. Aceptar licencias de SDK si es necesario
-```
+```kotlin
+// 1. Crear las carpetas necesarias dentro de core/src/com/juegotron/game/
+models/
+rendering/
+ui/
+viewmodel/
+network/
+config/
 
----
-
-#### **Paso 3: Configurar SDK de Android**
-
-```
-Tools → SDK Manager → SDK Platforms
-✅ Android 7.0 (Nougat) - API 24 (mínimo)
-✅ Android 13.0 (Tiramisu) - API 33 (recomendado)
-
-Tools → SDK Manager → SDK Tools
-✅ Android SDK Build-Tools
-✅ Android SDK Platform-Tools
-✅ Android Emulator (si no tienes dispositivo físico)
+// 2. Agregar los archivos .kt en cada carpeta correspondiente
+// 3. Agregar los modelos 3D en android/assets/models/
+// 4. Agregar los shaders en android/assets/shaders/
 ```
 
 ---
 
-### 🚀 Ejecutar el Proyecto
+### **🚀 PASO 10: Compilar y Ejecutar**
 
-#### **En Desktop (Desarrollo rápido)**
+#### **Opción 1: Ejecutar en Desktop (Más rápido para probar)**
 
 ```bash
-# Ejecutar en Windows/Mac/Linux
-./gradlew desktop:run
-
-# O en Windows:
+# En Windows
 gradlew.bat desktop:run
+
+# En Mac/Linux
+./gradlew desktop:run
 ```
 
-#### **En Android (Dispositivo real)**
+**Deberías ver:**
+```
+> Task :desktop:run
+[LibGDX Application] Created window
+[LibGDX Application] OpenGL version: 4.6
+🎮 TRON 3D iniciado correctamente
+```
+
+---
+
+#### **Opción 2: Ejecutar en Android**
+
+**Con dispositivo físico:**
+
+1. Conecta tu teléfono por USB
+2. Activa **"Depuración USB"** en Opciones de Desarrollador
+3. En Android Studio, selecciona tu dispositivo en la lista
+4. Click en el botón **▶ Run**
+
+**O desde terminal:**
 
 ```bash
-# 1. Conectar dispositivo por USB
-# 2. Activar "Depuración USB" en Opciones de Desarrollador
-
-# 3. Instalar y ejecutar
+# Instalar en dispositivo conectado
 ./gradlew android:installDebug
 
-# 4. La app "TRON 3D" aparecerá en el dispositivo
+# La app aparecerá en tu teléfono como "TRON 3D"
 ```
 
 ---
 
-### 🐛 Problemas Comunes y Soluciones
+### **⏱️ Tiempo Total Estimado**
 
-#### ❌ **Error: "Redeclaration: class AndroidLauncher"**
+```
+┌────────────────────────────────────────┐
+│ Descargar generador:       1 min       │
+│ Generar proyecto:          2 min       │
+│ Gradle sync primera vez:   5-10 min    │
+│ Configurar SDK:            3 min       │
+│ Agregar archivos:          5 min       │
+├────────────────────────────────────────┤
+│ TOTAL:                     15-20 min   │
+└────────────────────────────────────────┘
+```
+
+---
+
+### **🔗 Links Útiles**
+
+- **Generador LibGDX**: https://libgdx.com/dev/project-generation/
+- **Documentación LibGDX**: https://libgdx.com/wiki/
+- **Setup Guide**: https://libgdx.com/dev/setup/
+- **fbx-conv** (para modelos 3D): https://github.com/libgdx/fbx-conv
+
+---
+
+## 🐛 Problemas Comunes y Soluciones
+
+### ❌ **Error: "SDK location not found"**
+
+**Síntoma:**
+```
+SDK location not found. Define location with sdk.dir in the local.properties file
+```
+
+**Solución:**
+
+```bash
+# Crear archivo local.properties en la raíz del proyecto
+# Windows:
+echo sdk.dir=C:\\Users\\TuNombre\\AppData\\Local\\Android\\Sdk > local.properties
+
+# Mac/Linux:
+echo "sdk.dir=/Users/TuNombre/Library/Android/sdk" > local.properties
+```
+
+---
+
+### ❌ **Error: "Redeclaration: class AndroidLauncher"**
 
 **Síntoma:**
 ```
@@ -437,7 +649,27 @@ BUILD FAILED
 
 ---
 
-#### ❌ **Modelos 3D no se cargan**
+### ❌ **Error: "Cannot find symbol: class LibGDX"**
+
+**Síntoma:**
+Gradle no encuentra las dependencias de LibGDX
+
+**Solución:**
+
+```bash
+# 1. Limpiar caché de Gradle
+./gradlew clean
+
+# 2. Invalidar caché de Android Studio
+File → Invalidate Caches → Invalidate and Restart
+
+# 3. Forzar descarga de dependencias
+./gradlew build --refresh-dependencies
+```
+
+---
+
+### ❌ **Modelos 3D no se cargan**
 
 **Síntoma:** Pantalla negra, motos no aparecen
 
@@ -452,24 +684,53 @@ ls android/assets/models/
 
 ---
 
-#### ❌ **Bajo rendimiento / FPS bajos**
+### ❌ **Bajo rendimiento / FPS bajos**
 
 **Solución:**
 ```kotlin
 // Editar: core/src/.../config/TronVisualConfig.kt
 const val ENABLE_BLOOM = false  // Desactivar en gama baja
 const val TRAIL_SEGMENTS_MAX = 100  // Reducir de 500
+const val SHADOW_MAP_SIZE = 1024  // En vez de 2048
+const val ANTIALIASING_SAMPLES = 0  // En vez de 4
 ```
 
 ---
 
-#### ❌ **Bluetooth no conecta**
+### ❌ **Bluetooth no conecta**
 
 **Verificar:**
-- ✅ Permisos en AndroidManifest.xml
+- ✅ Permisos en `AndroidManifest.xml`
 - ✅ Bluetooth activado en ambos dispositivos
 - ✅ Dispositivos emparejados previamente
-- ✅ Android 12+ requiere permisos BLUETOOTH_CONNECT
+- ✅ Android 12+ requiere permisos `BLUETOOTH_CONNECT`
+
+**Agregar permisos en AndroidManifest.xml:**
+
+```xml
+<uses-permission android:name="android.permission.BLUETOOTH" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+```
+
+---
+
+### ❌ **Error: "Java heap space"**
+
+**Síntoma:**
+```
+java.lang.OutOfMemoryError: Java heap space
+```
+
+**Solución:**
+
+Editar `gradle.properties`:
+
+```properties
+# Aumentar memoria de Gradle
+org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=512m
+```
 
 ---
 
@@ -644,4 +905,7 @@ assetManager.load("models/mi_moto.g3db", Model::class.java)
    ██║   ██║  ██║██║  ██║██║ ╚████║██║  ██╗███████║
    ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝
 ```
+
+
+
 </div>
